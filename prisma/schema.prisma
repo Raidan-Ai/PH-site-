@@ -1,0 +1,201 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  root
+  admin
+  staff
+  journalist
+  user
+  editor
+  viewer
+  content_creator
+}
+
+enum ContentCategory {
+  news
+  report
+  press_release
+}
+
+enum ContentStatus {
+  draft
+  published
+}
+
+enum Language {
+  ar
+  en
+  both
+}
+
+enum ViolationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum ProjectStatus {
+  ongoing
+  completed
+  seeking_funding
+}
+
+enum OpenStatus {
+  open
+  closed
+}
+
+model User {
+  uid          String    @id @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  displayName  String?   @db.VarChar(255)
+  photoURL     String?   @db.VarChar(1024)
+  role         Role      @default(user)
+  createdAt    DateTime  @default(now()) @db.Timestamp(6)
+  articles     Article[]
+
+  @@map("users")
+}
+
+model Article {
+  id                String          @id @db.VarChar(255)
+  title             String          @db.Text // JSON string representation
+  content           String          @db.Text // JSON string representation
+  category          ContentCategory
+  authorId          String?         @db.VarChar(255)
+  status            ContentStatus   @default(draft)
+  language          Language        @default(ar)
+  mainImage         String?         @db.VarChar(1024)
+  showInSlider      Boolean         @default(false) @map("show_in_slider")
+  sliderCaption     String?         @map("slider_caption") @db.Text // JSON string representation
+  sliderButtonText  String?         @map("slider_button_text") @db.Text // JSON string representation
+  sliderImage       String?         @map("slider_image") @db.VarChar(1024)
+  seo               String?         @db.Text // JSON string representation
+  accessTier        String          @default("public") @map("access_tier") @db.VarChar(50)
+  sectorId          String?         @map("sector_id") @db.VarChar(255)
+  programId         String?         @map("program_id") @db.VarChar(255)
+  projectId         String?         @map("project_id") @db.VarChar(255)
+  createdAt         DateTime        @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  author            User?           @relation(fields: [authorId], references: [uid], onDelete: SetNull)
+
+  @@map("articles")
+}
+
+model Violation {
+  id                String          @id @db.VarChar(255)
+  reporterName      String?         @db.VarChar(255)
+  reporterPhone     String?         @db.VarChar(255)
+  victimName        String?         @db.VarChar(255)
+  victimInstitution String?         @db.VarChar(255)
+  governorate       String?         @db.VarChar(255)
+  district          String?         @db.VarChar(255)
+  date              DateTime?       @db.Timestamp(6)
+  perpetrator       String?         @db.VarChar(255)
+  type              String?         @db.VarChar(255)
+  description       String?         @db.Text
+  evidenceLinks     String?         @db.Text // JSON string representation
+  status            ViolationStatus @default(pending)
+  latitude          Float?
+  longitude         Float?
+  createdAt         DateTime        @default(now()) @db.Timestamp(6)
+
+  @@map("violations")
+}
+
+model Project {
+  id             String        @id @db.VarChar(255)
+  title          String        @db.Text // JSON string representation
+  description    String        @db.Text // JSON string representation
+  image          String?       @db.VarChar(1024)
+  status         ProjectStatus @default(ongoing)
+  fundingGoal    Decimal?      @db.Decimal(10, 2)
+  currentFunding Decimal?      @db.Decimal(10, 2)
+  isFeatured     Boolean       @default(false)
+  showInSlider   Boolean       @default(false) @map("show_in_slider")
+  sliderCaption  String?       @map("slider_caption") @db.Text
+  sliderButtonText String?     @map("slider_button_text") @db.Text
+  sliderImage    String?       @map("slider_image") @db.VarChar(1024)
+  seo            String?       @db.Text
+  createdAt      DateTime      @default(now()) @db.Timestamp(6)
+
+  @@map("projects")
+}
+
+model Job {
+  id               String      @id @db.VarChar(255)
+  title            String      @db.Text // JSON string representation
+  description      String      @db.Text // JSON string representation
+  requirements     String      @db.Text // JSON string representation
+  deadline         DateTime?   @db.Timestamp(6)
+  status           OpenStatus  @default(open)
+  showInSlider     Boolean     @default(false) @map("show_in_slider")
+  sliderCaption    String?     @map("slider_caption") @db.Text
+  sliderButtonText String?     @map("slider_button_text") @db.Text
+  sliderImage      String?     @map("slider_image") @db.VarChar(1024)
+  seo              String?     @db.Text
+  sectorId         String?     @map("sector_id") @db.VarChar(255)
+  programId        String?     @map("program_id") @db.VarChar(255)
+  projectId        String?     @map("project_id") @db.VarChar(255)
+  createdAt        DateTime    @default(now()) @db.Timestamp(6)
+
+  @@map("jobs")
+}
+
+model PageContent {
+  id          Int      @id @default(autoincrement())
+  pageName    String   @map("page_name") @db.VarChar(255)
+  sectionName String   @map("section_name") @db.VarChar(255)
+  content     String   @db.Text // JSON string representation
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@unique([pageName, sectionName])
+  @@map("page_content")
+}
+
+model SiteSetting {
+  id                     Int      @id @default(autoincrement())
+  siteName               String?  @db.Text // JSON string representation
+  logo                   String?  @db.Text
+  favicon                String?  @db.Text
+  primaryColor           String?  @db.VarChar(50)
+  secondaryColor         String?  @db.VarChar(50)
+  fontFamily             String?  @db.VarChar(50)
+  socialLinks            String?  @db.Text // JSON string representation
+  contactEmail           String?  @db.VarChar(255)
+  contactPhone           String?  @db.VarChar(255)
+  address                String?  @db.Text // JSON string representation
+  sshPublicKey           String?  @db.Text
+  tunnelingEnabled       Boolean  @default(false)
+  livestream             String?  @db.Text // JSON string representation
+  sliderAutoplayDelay    Int      @default(8000)
+  sliderTransitionSpeed  Int      @default(1000)
+  seoTitle               String?  @db.Text
+  seoDescription         String?  @db.Text
+  seoKeywords            String?  @db.Text
+  ogDefaultImage         String?  @db.Text
+  ogSiteName             String?  @db.Text
+  ogType                 String?  @default("website") @db.VarChar(50)
+  googleVerification     String?  @db.Text
+  bingVerification       String?  @db.Text
+  aiEnabled              Boolean  @default(true)
+  aiModel                String?  @default("nvidia/qwen-2.5-coder-32b-instruct") @db.Text
+  aiBaseUrl              String?  @default("https://integrate.api.nvidia.com/v1") @db.Text
+  aiApiKey               String?  @db.Text
+  aiTemperature          Float?   @default(0.3)
+  aiMaxTokens            Int?     @default(1524)
+  aiSystemInstruction    String?  @db.Text
+  maintenanceMode        Int      @default(0)
+  maintenanceMessage     String?  @db.Text
+
+  @@map("site_settings")
+}

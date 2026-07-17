@@ -1,0 +1,8 @@
+{
+  "name": "PressHouse (بيت الصحافة - اليمن)",
+  "description": "منصة إعلامية متكاملة لمؤسسة بيت الصحافة في اليمن (ph-ye.org). تشمل نظام إدارة محتوى، توثيق انتهاكات، وأكاديمية تدريبية متطورة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
