@@ -441,6 +441,8 @@ try {
       displayName TEXT,
       photoURL TEXT,
       role TEXT NOT NULL,
+      googleId TEXT UNIQUE,
+      linkedinId TEXT UNIQUE,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -448,6 +450,17 @@ try {
 } catch (e: any) {
   console.error('Migration Error (users):', e.message);
 }
+
+// Add columns if they don't exist
+try {
+  db.exec("ALTER TABLE users ADD COLUMN googleId TEXT UNIQUE;");
+  console.log('Database Migration: Added googleId column to users');
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE users ADD COLUMN linkedinId TEXT UNIQUE;");
+  console.log('Database Migration: Added linkedinId column to users');
+} catch (e) {}
 
 try {
   db.exec(`
@@ -741,14 +754,43 @@ try {
   `);
 
   // New slider customization migrations
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hero_slides (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        subtitle TEXT,
+        description TEXT,
+        mediaType TEXT,
+        mediaUrl TEXT,
+        animationType TEXT,
+        textAnimation TEXT DEFAULT 'slide-up',
+        titleSize TEXT DEFAULT 'text-4xl md:text-6xl lg:text-7xl',
+        subtitleSize TEXT DEFAULT 'text-xs',
+        descriptionSize TEXT DEFAULT 'text-lg md:text-xl',
+        buttonSize TEXT DEFAULT 'px-8 py-4',
+        overlayOpacity INTEGER DEFAULT 60,
+        textAlign TEXT DEFAULT 'left',
+        primaryButton TEXT,
+        secondaryButton TEXT,
+        "order" INTEGER DEFAULT 0,
+        isActive BOOLEAN DEFAULT TRUE,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Database Migration: Checked/Created hero_slides table');
+  } catch (e: any) {
+    console.error('Migration Error (hero_slides):', e.message);
+  }
+
   const heroColumns = [
-    { name: 'textAnimation', type: 'TEXT DEFAULT "slide-up"' },
-    { name: 'titleSize', type: 'TEXT DEFAULT "text-4xl md:text-6xl lg:text-7xl"' },
-    { name: 'subtitleSize', type: 'TEXT DEFAULT "text-xs"' },
-    { name: 'descriptionSize', type: 'TEXT DEFAULT "text-lg md:text-xl"' },
-    { name: 'buttonSize', type: 'TEXT DEFAULT "px-8 py-4"' },
+    { name: 'textAnimation', type: "TEXT DEFAULT 'slide-up'" },
+    { name: 'titleSize', type: "TEXT DEFAULT 'text-4xl md:text-6xl lg:text-7xl'" },
+    { name: 'subtitleSize', type: "TEXT DEFAULT 'text-xs'" },
+    { name: 'descriptionSize', type: "TEXT DEFAULT 'text-lg md:text-xl'" },
+    { name: 'buttonSize', type: "TEXT DEFAULT 'px-8 py-4'" },
     { name: 'overlayOpacity', type: 'INTEGER DEFAULT 60' },
-    { name: 'textAlign', type: 'TEXT DEFAULT "left"' }
+    { name: 'textAlign', type: "TEXT DEFAULT 'left'" }
   ];
 
   heroColumns.forEach(col => {
@@ -811,7 +853,64 @@ try {
   try { db.exec("ALTER TABLE site_settings ADD COLUMN smtpPort INTEGER;"); } catch(e) {}
   try { db.exec("ALTER TABLE site_settings ADD COLUMN smtpUser TEXT;"); } catch(e) {}
   try { db.exec("ALTER TABLE site_settings ADD COLUMN smtpPass TEXT;"); } catch(e) {}
-  try { db.exec("ALTER TABLE site_settings ADD COLUMN smtpFrom TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE site_settings ADD COLUMN smtpFrom TEXT;"); } catch(e) {}
+  
+  // Email Templates Table
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS email_templates (
+        id TEXT PRIMARY KEY,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        subject_ar TEXT NOT NULL,
+        subject_en TEXT NOT NULL,
+        content_ar TEXT NOT NULL,
+        content_en TEXT NOT NULL,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Seed default templates
+    const templateRow = db.prepare("SELECT COUNT(*) as count FROM email_templates").get() as any;
+    if (templateRow && templateRow.count === 0) {
+      const defaultTemplates = [
+        {
+          id: 'account_verification',
+          name_ar: 'تأكيد الحساب',
+          name_en: 'Account Verification',
+          subject_ar: 'تأكيد حسابك في بيت الصحافة',
+          subject_en: 'Verify your account at Press House',
+          content_ar: '<h1>مرحباً {{name}}</h1><p>شكراً لإنضمامك إلينا. يرجى الضغط على الرابط أدناه لتأكيد حسابك:</p><a href="{{link}}">تأكيد الحساب</a>',
+          content_en: '<h1>Hello {{name}}</h1><p>Thank you for joining us. Please click the link below to verify your account:</p><a href="{{link}}">Verify Account</a>'
+        },
+        {
+          id: 'password_reset',
+          name_ar: 'استعادة كلمة السر',
+          name_en: 'Password Reset',
+          subject_ar: 'طلب استعادة كلمة السر',
+          subject_en: 'Password Reset Request',
+          content_ar: '<h1>مرحباً {{name}}</h1><p>لقد تلقينا طلباً لاستعادة كلمة السر الخاصة بك. إذا لم تقم بهذا الطلب، يمكنك تجاهل هذه الرسالة.</p><a href="{{link}}">استعادة كلمة السر</a>',
+          content_en: '<h1>Hello {{name}}</h1><p>We received a request to reset your password. If you didn\'t make this request, you can ignore this email.</p><a href="{{link}}">Reset Password</a>'
+        },
+        {
+          id: 'invitation',
+          name_ar: 'دعوة للانضمام',
+          name_en: 'Invitation',
+          subject_ar: 'دعوة للانضمام إلى بيت الصحافة',
+          subject_en: 'Invitation to join Press House',
+          content_ar: '<h1>مرحباً</h1><p>لقد تمت دعوتك للانضمام إلى منصة بيت الصحافة. يرجى الضغط على الرابط أدناه لإكمال تسجيلك:</p><a href="{{link}}">قبول الدعوة</a>',
+          content_en: '<h1>Hello</h1><p>You have been invited to join Press House platform. Please click the link below to complete your registration:</p><a href="{{link}}">Accept Invitation</a>'
+        }
+      ];
+      const insertTpl = db.prepare("INSERT INTO email_templates (id, name_ar, name_en, subject_ar, subject_en, content_ar, content_en) VALUES (?, ?, ?, ?, ?, ?, ?)");
+      for (const tpl of defaultTemplates) {
+        insertTpl.run(tpl.id, tpl.name_ar, tpl.name_en, tpl.subject_ar, tpl.subject_en, tpl.content_ar, tpl.content_en);
+      }
+    }
+    console.log('Database Migration: Checked/Created/Seeded email_templates table');
+  } catch (e: any) {
+    console.error('Database Migration Error (email_templates SQLite):', e.message);
+  }
   
   // Enterprise CMS Extension Tables Check
   try {
@@ -1094,7 +1193,7 @@ try {
     { name: 'sector_id', type: 'TEXT' },
     { name: 'description_full_ar', type: 'TEXT' },
     { name: 'description_full_en', type: 'TEXT' },
-    { name: 'status', type: 'TEXT DEFAULT "published"' }
+    { name: 'status', type: "TEXT DEFAULT 'published'" }
   ];
   programCols.forEach(col => {
     try {
@@ -1103,6 +1202,40 @@ try {
   });
 
   // 3. Project Extensions
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS institution_identity (
+        id INTEGER PRIMARY KEY,
+        name_ar TEXT,
+        name_en TEXT,
+        description_ar TEXT,
+        description_en TEXT,
+        vision_ar TEXT,
+        vision_en TEXT,
+        mission_ar TEXT,
+        mission_en TEXT,
+        goals TEXT,
+        work_fields TEXT,
+        logo_main TEXT,
+        logo_colored TEXT,
+        logo_dark TEXT,
+        logo_white TEXT,
+        favicon TEXT,
+        primaryColor TEXT,
+        secondaryColor TEXT,
+        accentColor TEXT,
+        fontArPrimary TEXT,
+        fontArSecondary TEXT,
+        fontEnPrimary TEXT,
+        fontEnSecondary TEXT,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Database Migration: Checked/Created institution_identity table');
+  } catch (e: any) {
+    console.error('Migration Error (institution_identity):', e.message);
+  }
+
   const richProjectCols = [
     { name: 'reference_code', type: 'TEXT' },
     { name: 'short_name_ar', type: 'TEXT' },

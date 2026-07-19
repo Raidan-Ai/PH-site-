@@ -1413,7 +1413,12 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Google OAuth URL
 app.get('/api/auth/google/url', (req, res) => {
-  const redirectUri = `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback`;
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const redirectUri = process.env.APP_URL 
+    ? `${process.env.APP_URL}/api/auth/google/callback`
+    : `${protocol}://${host}/api/auth/google/callback`;
+
   const url = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
@@ -1424,9 +1429,13 @@ app.get('/api/auth/google/url', (req, res) => {
 
 // Google OAuth Callback
 app.get('/api/auth/google/callback', async (req, res) => {
-  const code = req.query.code as string;
-  const redirectUri = `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback`;
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const redirectUri = process.env.APP_URL 
+    ? `${process.env.APP_URL}/api/auth/google/callback`
+    : `${protocol}://${host}/api/auth/google/callback`;
 
+  const code = req.query.code as string;
   try {
     const { tokens } = await googleClient.getToken({
       code,
@@ -1479,6 +1488,98 @@ app.get('/api/auth/google/callback', async (req, res) => {
     `);
   } catch (error: any) {
     console.error('Google OAuth error:', error);
+    res.status(500).send('Authentication failed');
+  }
+});
+
+// LinkedIn OAuth URL
+app.get('/api/auth/linkedin/url', (req, res) => {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const redirectUri = process.env.APP_URL 
+    ? `${process.env.APP_URL}/api/auth/linkedin/callback`
+    : `${protocol}://${host}/api/auth/linkedin/callback`;
+
+  const clientId = process.env.LINKEDIN_CLIENT_ID;
+  const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=DCEEFWF45453sdffef424&scope=openid%20profile%20email`;
+  
+  res.json({ url });
+});
+
+// LinkedIn OAuth Callback
+app.get('/api/auth/linkedin/callback', async (req, res) => {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const redirectUri = process.env.APP_URL 
+    ? `${process.env.APP_URL}/api/auth/linkedin/callback`
+    : `${protocol}://${host}/api/auth/linkedin/callback`;
+
+  const code = req.query.code as string;
+  const clientId = process.env.LINKEDIN_CLIENT_ID;
+  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+
+  try {
+    // 1. Get access token
+    const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', 
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId!,
+        client_secret: clientSecret!
+      }).toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // 2. Get user info (OpenID Connect)
+    const userResponse = await axios.get('https://api.linkedin.com/v2/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const { sub: linkedinId, email, name, picture } = userResponse.data;
+
+    // Check if user exists
+    const [rows] = await pool.query('SELECT * FROM users WHERE linkedinId = ? OR email = ?', [linkedinId, email]);
+    let user = (rows as any)[0];
+
+    if (!user) {
+      const uid = Math.random().toString(36).substring(2, 11);
+      const role = 'member';
+      await pool.query(
+        'INSERT INTO users (uid, email, displayName, photoURL, linkedinId, role) VALUES (?, ?, ?, ?, ?, ?)',
+        [uid, email, name, picture, linkedinId, role]
+      );
+      user = { uid, email, displayName: name, photoURL: picture, role };
+    } else if (!user.linkedinId) {
+      await pool.query('UPDATE users SET linkedinId = ?, photoURL = ? WHERE uid = ?', [linkedinId, picture, user.uid]);
+      user.linkedinId = linkedinId;
+      user.photoURL = picture;
+    }
+
+    const token = jwt.sign({ uid: user.uid, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
+    
+    // Return HTML to communicate with opener
+    res.send(`
+      <html>
+        <body>
+          <script>
+            window.opener.postMessage({ 
+              type: 'LINKEDIN_AUTH_SUCCESS', 
+              token: '${token}',
+              user: ${JSON.stringify({ uid: user.uid, email: user.email, role: user.role, displayName: user.displayName })}
+            }, "*");
+            window.close();
+          </script>
+          <p>Authentication successful. Closing window...</p>
+        </body>
+      </html>
+    `);
+  } catch (error: any) {
+    console.error('LinkedIn OAuth Error:', error.response?.data || error.message);
     res.status(500).send('Authentication failed');
   }
 });
@@ -2117,6 +2218,19 @@ app.get('/api/academy/applications', async (req, res) => {
     res.json(rows);
   } catch (error: any) {
     res.status(500).json({ message: 'Error fetching applications', error: error.message });
+  }
+});
+
+app.post('/api/academy/apply', async (req, res) => {
+  const { course_id, full_name, email, phone, education, experience, motivation, cv_url } = req.body;
+  try {
+    await pool.query(
+      'INSERT INTO academy_applications (course_id, full_name, email, phone, education, experience, motivation, cv_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [course_id, full_name, email, phone, education, experience, motivation, cv_url]
+    );
+    res.json({ success: true, message: 'Application submitted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Failed to submit application', error: error.message });
   }
 });
 

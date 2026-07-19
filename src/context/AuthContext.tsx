@@ -9,6 +9,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateUserContext: (token: string, user: User) => void;
   googleLogin: () => Promise<void>;
+  linkedinLogin: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,9 +61,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const googleLogin = async () => {
     try {
       const { data } = await api.get('/api/auth/google/url');
-      window.open(data.url, 'google_auth', 'width=600,height=700');
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(data.url, 'google_auth', `width=${width},height=${height},left=${left},top=${top}`);
+
+      const handleMessage = async (event: MessageEvent) => {
+        if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+          const { token, user } = event.data;
+          updateUserContext(token, user);
+          window.removeEventListener('message', handleMessage);
+          window.location.href = '/';
+        }
+      };
+      window.addEventListener('message', handleMessage);
     } catch (err) {
       console.error('Google OAuth initialization failed:', err);
+      throw err;
+    }
+  };
+
+  const linkedinLogin = async () => {
+    try {
+      const { data } = await api.get('/api/auth/linkedin/url');
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(data.url, 'linkedin_auth', `width=${width},height=${height},left=${left},top=${top}`);
+
+      const handleMessage = async (event: MessageEvent) => {
+        if (event.data.type === 'LINKEDIN_AUTH_SUCCESS') {
+          const { token, user } = event.data;
+          updateUserContext(token, user);
+          window.removeEventListener('message', handleMessage);
+          window.location.href = '/';
+        }
+      };
+      window.addEventListener('message', handleMessage);
+    } catch (err) {
+      console.error('LinkedIn OAuth initialization failed:', err);
       throw err;
     }
   };
@@ -77,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, signOut, updateUserContext }}>
+    <AuthContext.Provider value={{ user, userData, loading, signOut, updateUserContext, googleLogin, linkedinLogin }}>
       {children}
     </AuthContext.Provider>
   );

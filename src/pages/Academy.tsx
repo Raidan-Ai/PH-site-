@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlayCircle, Clock, BookOpen, Star, ArrowRight, GraduationCap, Award, Users, Search, Loader2, Radio, User } from 'lucide-react';
+import { PlayCircle, Clock, BookOpen, Star, ArrowRight, GraduationCap, Award, Users, Search, Loader2, Radio, User, X, Mail, Phone, FileText, Send, CheckCircle2 } from 'lucide-react';
 import { SEO } from '../components/common/SEO';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,6 +14,43 @@ export default function Academy() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [settings, setSettings] = useState<any>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    education: '',
+    experience: '',
+    motivation: '',
+    cv_url: ''
+  });
+
+  const handleApply = (course: Course) => {
+    setSelectedCourse(course);
+    setIsModalOpen(true);
+    setSubmitted(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourse) return;
+    setSubmitting(true);
+    try {
+      await api.post('/api/academy/apply', {
+        ...formData,
+        course_id: selectedCourse.id
+      });
+      setSubmitted(true);
+      setFormData({ full_name: '', email: '', phone: '', education: '', experience: '', motivation: '', cv_url: '' });
+    } catch (err) {
+      alert(isRtl ? 'فشل إرسال الطلب' : 'Failed to submit application');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -320,7 +357,10 @@ export default function Academy() {
                         {course.videos?.length || 0} {isRtl ? 'دروس' : 'Lessons'}
                       </span>
                     </div>
-                    <button className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center transition-all">
+                    <button 
+                      onClick={() => handleApply(course)}
+                      className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center transition-all"
+                    >
                       <ArrowRight size={18} className={isRtl ? 'rotate-180' : ''} />
                     </button>
                   </div>
@@ -365,6 +405,164 @@ export default function Academy() {
           </div>
         </div>
       </section>
+
+      {/* Application Modal */}
+      <AnimatePresence>
+        {isModalOpen && selectedCourse && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden"
+              dir={isRtl ? 'rtl' : 'ltr'}
+            >
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-6 left-6 z-10 p-2 text-slate-400 hover:text-slate-900 bg-slate-100 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+                <div className="md:w-1/3 bg-blue-600 p-8 text-white space-y-6 hidden md:block">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <GraduationCap size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">{isRtl ? 'تقديم طلب' : 'Apply Now'}</h3>
+                    <p className="text-blue-100 text-sm mt-2">{selectedCourse.title[isRtl ? 'ar' : 'en']}</p>
+                  </div>
+                  <div className="space-y-4 pt-8 text-xs text-blue-100/60">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 size={16} />
+                      {isRtl ? 'مراجعة دقيقة لكل طلب' : 'Careful review of each app'}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 size={16} />
+                      {isRtl ? 'شهادات معتمدة' : 'Certified certificates'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 p-8 overflow-y-auto">
+                  {submitted ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-12">
+                      <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                        <CheckCircle2 size={40} />
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900">{isRtl ? 'تم إرسال طلبك بنجاح!' : 'Application Sent!'}</h3>
+                      <p className="text-slate-500">
+                        {isRtl 
+                          ? 'شكراً لاهتمامك. سيقوم فريق الأكاديمية بمراجعة طلبك والتواصل معك قريباً عبر البريد الإلكتروني.' 
+                          : 'Thank you for your interest. Our academy team will review your application and contact you soon via email.'}
+                      </p>
+                      <button 
+                        onClick={() => setIsModalOpen(false)}
+                        className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold mt-4"
+                      >
+                        {isRtl ? 'إغلاق' : 'Close'}
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <header>
+                        <h2 className="text-2xl font-bold text-slate-900">{isRtl ? 'استمارة التقديم' : 'Application Form'}</h2>
+                        <p className="text-slate-500 text-sm">{isRtl ? 'يرجى ملء البيانات التالية بدقة' : 'Please fill in the following details accurately'}</p>
+                      </header>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <User size={14} /> {isRtl ? 'الاسم الكامل' : 'Full Name'}
+                          </label>
+                          <input 
+                            required
+                            type="text"
+                            value={formData.full_name}
+                            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                              <Mail size={14} /> {isRtl ? 'البريد الإلكتروني' : 'Email'}
+                            </label>
+                            <input 
+                              required
+                              type="email"
+                              value={formData.email}
+                              onChange={(e) => setFormData({...formData, email: e.target.value})}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                              <Phone size={14} /> {isRtl ? 'رقم الهاتف' : 'Phone'}
+                            </label>
+                            <input 
+                              required
+                              type="tel"
+                              value={formData.phone}
+                              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <FileText size={14} /> {isRtl ? 'التعليم والخبرة' : 'Education & Experience'}
+                          </label>
+                          <textarea 
+                            required
+                            rows={3}
+                            value={formData.experience}
+                            onChange={(e) => setFormData({...formData, experience: e.target.value})}
+                            placeholder={isRtl ? 'اذكر نبذة عن خلفيتك التعليمية والمهنية' : 'Briefly describe your educational and professional background'}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <Send size={14} /> {isRtl ? 'لماذا تريد الانضمام؟' : 'Why do you want to join?'}
+                          </label>
+                          <textarea 
+                            required
+                            rows={3}
+                            value={formData.motivation}
+                            onChange={(e) => setFormData({...formData, motivation: e.target.value})}
+                            placeholder={isRtl ? 'ما الذي تأمل تحقيقه من هذه الدورة؟' : 'What do you hope to achieve from this course?'}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      <button 
+                        disabled={submitting}
+                        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+                      >
+                        {submitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                        {isRtl ? 'إرسال الطلب' : 'Submit Application'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

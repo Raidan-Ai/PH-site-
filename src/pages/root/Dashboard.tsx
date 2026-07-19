@@ -1,11 +1,12 @@
 import React from 'react';
-import { Server, Database, Shield, Settings, Activity, LayoutDashboard, Globe, Users, Book } from 'lucide-react';
+import { Server, Database, Shield, Settings, Activity, LayoutDashboard, Globe, Users, Book, Mail, User } from 'lucide-react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useTranslation } from 'react-i18next';
 import CloudflareManager from '../../components/admin/CloudflareManager';
 import UserManager from './UserManager';
 import SystemSettings from './SystemSettings';
+import EmailTemplates from './EmailTemplates';
 import { useAuth } from '../../context/AuthContext';
 import { SystemMonitoring, DatabaseManager, SecurityHardening, ServerLogs } from './SystemModules';
 import { SystemDocs } from '../admin/SystemDocs';
@@ -29,6 +30,7 @@ export default function RootDashboard() {
     { name: isRtl ? 'نظرة عامة' : 'Overview', path: '/root', icon: <LayoutDashboard size={20} /> },
     { name: isRtl ? 'الملف الشخصي' : 'Profile', path: '/root/profile', icon: <User size={20} /> },
     { name: isRtl ? 'إدارة المستخدمين' : 'Users', path: '/root/users', icon: <Users size={20} /> },
+    { name: isRtl ? 'قوالب المراسلات' : 'Emails', path: '/root/emails', icon: <Mail size={20} /> },
     { name: isRtl ? 'إعدادات النظام' : 'System Settings', path: '/root/settings', icon: <Settings size={20} /> },
     { name: isRtl ? 'إدارة النطاقات' : 'DNS Management', path: '/root/dns', icon: <Globe size={20} /> },
     { name: isRtl ? 'مراقبة النظام' : 'Monitoring', path: '/root/monitoring', icon: <Activity size={20} /> },
@@ -48,6 +50,7 @@ export default function RootDashboard() {
         <Route path="/" element={<RootOverview isRtl={isRtl} />} />
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/users" element={<UserManager />} />
+        <Route path="/emails" element={<EmailTemplates />} />
         <Route path="/settings" element={<SystemSettings />} />
         <Route path="/dns" element={<CloudflareManager />} />
         <Route path="/monitoring" element={<SystemMonitoring isRtl={isRtl} />} />

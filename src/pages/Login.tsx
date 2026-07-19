@@ -12,30 +12,23 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { updateUserContext, googleLogin, linkedinLogin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { updateUserContext, googleLogin } = useAuth();
-
-  // Google OAuth Listener
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) return;
-      
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        updateUserContext(event.data.token, event.data.user);
-        navigate('/');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [navigate, updateUserContext]);
 
   const handleGoogleLogin = async () => {
     try {
       await googleLogin();
     } catch (err) {
       setError(isRtl ? 'فشل الاتصال بجوجل' : 'Google connection failed');
+    }
+  };
+
+  const handleLinkedinLogin = async () => {
+    try {
+      await linkedinLogin();
+    } catch (err) {
+      setError(isRtl ? 'فشل الاتصال بلينكد إن' : 'LinkedIn connection failed');
     }
   };
 
@@ -76,13 +69,23 @@ export default function Login() {
         )}
 
         <div className="space-y-4">
-          <button 
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            {isRtl ? 'متابعة باستخدام جوجل' : 'Continue with Google'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+              onClick={handleGoogleLogin}
+              className="flex-1 flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+              {isRtl ? 'جوجل' : 'Google'}
+            </button>
+            
+            <button 
+              onClick={handleLinkedinLogin}
+              className="flex-1 flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700"
+            >
+              <img src="https://www.linkedin.com/favicon.ico" className="w-5 h-5" alt="LinkedIn" />
+              {isRtl ? 'لينكد إن' : 'LinkedIn'}
+            </button>
+          </div>
           
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>

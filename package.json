@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "NODE_ENV=production tsx server.ts",
+    "dev": "tsx src/server.ts",
+    "start": "NODE_ENV=production tsx src/server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "setup": "tsx scripts/setup.ts",
@@ -57,7 +57,8 @@
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.8.1",
     "swiper": "^12.1.2",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "telegraf": "4.16.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",

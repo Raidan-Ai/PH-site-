@@ -14,7 +14,7 @@ export default function Register() {
   const { i18n } = useTranslation();
   const isRtl = i18n.language === 'ar';
   const navigate = useNavigate();
-  const { updateUserContext, googleLogin } = useAuth();
+  const { updateUserContext, googleLogin, linkedinLogin } = useAuth();
 
   // Form State
   const [step, setStep] = useState(1);
@@ -43,26 +43,19 @@ export default function Register() {
     portfolio: ''
   });
 
-  // Google OAuth Listener
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) return;
-      
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        updateUserContext(event.data.token, event.data.user);
-        navigate('/');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [navigate, updateUserContext]);
-
   const handleGoogleLogin = async () => {
     try {
       await googleLogin();
     } catch (err) {
       setError(isRtl ? 'فشل الاتصال بجوجل' : 'Google connection failed');
+    }
+  };
+
+  const handleLinkedinLogin = async () => {
+    try {
+      await linkedinLogin();
+    } catch (err) {
+      setError(isRtl ? 'فشل الاتصال بلينكد إن' : 'LinkedIn connection failed');
     }
   };
 
@@ -188,13 +181,24 @@ export default function Register() {
           <div className="md:col-span-8 p-8 md:p-12">
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-2xl font-bold text-slate-900">{isRtl ? 'إنشاء حساب جديد' : 'Registration'}</h1>
-              <button 
-                onClick={handleGoogleLogin}
-                className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-sm font-medium"
-              >
-                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-                {isRtl ? 'جوجل' : 'Google'}
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-sm font-medium"
+                >
+                  <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                  {isRtl ? 'جوجل' : 'Google'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleLinkedinLogin}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-sm font-medium"
+                >
+                  <img src="https://www.linkedin.com/favicon.ico" className="w-4 h-4" alt="LinkedIn" />
+                  {isRtl ? 'لينكد إن' : 'LinkedIn'}
+                </button>
+              </div>
             </div>
 
             {error && (
