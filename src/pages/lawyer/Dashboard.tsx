@@ -5,8 +5,8 @@ import { Routes, Route } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useTranslation } from 'react-i18next';
 import { AdminFooter } from '../../components/admin/AdminFooter';
-
-const ViolationsManager = () => <div className="p-8 text-center text-slate-500">Violations Management</div>;
+import { ViolationManager } from '../admin/Dashboard';
+import UserProfile from '../../components/UserProfile';
 
 export default function LawyerDashboard() {
   const { userData } = useAuth();
@@ -27,9 +27,9 @@ export default function LawyerDashboard() {
     >
       <Routes>
         <Route path="/" element={<LawyerOverview isRtl={isRtl} name={userData?.name || ''} />} />
-        <Route path="/violations" element={<ViolationsManager />} />
-        <Route path="/support" element={<div className="p-8 text-center text-slate-500">Legal Support Management Coming Soon</div>} />
-        <Route path="/settings" element={<div className="p-8 text-center text-slate-500">Settings coming soon</div>} />
+        <Route path="/violations" element={<ViolationManager isRtl={isRtl} />} />
+        <Route path="/support" element={<div className="p-8 text-center text-slate-500">{isRtl ? 'نظام الدعم القانوني قيد التطوير.' : 'Legal Support Management system is under development.'}</div>} />
+        <Route path="/settings" element={<UserProfile />} />
       </Routes>
       <AdminFooter />
     </AdminLayout>

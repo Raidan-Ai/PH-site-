@@ -58,6 +58,7 @@ export default function Home() {
   const [featuredProjects, setFeaturedProjects] = React.useState<any[]>([]);
   const [projectsLoading, setProjectsLoading] = React.useState(true);
   const [latestNews, setLatestNews] = React.useState<any[]>([]);
+  const [latestVideos, setLatestVideos] = React.useState<any[]>([]);
   const [pageContent, setPageContent] = React.useState<any[]>([]);
   const [comprehensiveStats, setComprehensiveStats] = React.useState<any>(null);
   const [liveIndicators, setLiveIndicators] = React.useState<any[]>([]);
@@ -248,6 +249,21 @@ export default function Home() {
       }
     };
     fetchNews();
+
+    const fetchVideos = async () => {
+      try {
+        const response = await fetch('/api/videos');
+        if (response.ok) {
+          const data = await response.json();
+          setLatestVideos(data.slice(0, 4));
+        } else {
+          setLatestVideos([]);
+        }
+      } catch (err) {
+        setLatestVideos([]);
+      }
+    };
+    fetchVideos();
   }, [isRtl]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
@@ -841,6 +857,73 @@ export default function Home() {
           ))}
         </Swiper>
       </section>
+
+      {/* Latest Videos */}
+      {latestVideos.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-8 mb-10 md:mb-12">
+            <div className="space-y-3 md:space-y-4">
+              <h2 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tight">
+                {isRtl ? 'أحدث الفيديوهات' : 'Latest Videos'}
+              </h2>
+            </div>
+            <Link to="/media/videos" className="group flex items-center gap-3 px-6 py-3.5 bg-white border-2 border-slate-100 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95">
+              {isRtl ? 'عرض كافة الفيديوهات' : 'View All Videos'}
+              <ArrowRight size={18} className={cn("transition-transform group-hover:translate-x-1", isRtl && "rotate-180 group-hover:-translate-x-1")} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {latestVideos.map((video, idx) => (
+              <motion.article 
+                key={video.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
+                className="group flex flex-col bg-white rounded-3xl overflow-hidden border border-slate-100 transition-all duration-300 hover:shadow-2xl hover:shadow-slate-200/50"
+              >
+                <div className="relative aspect-video overflow-hidden bg-slate-900">
+                  {video.thumbnail ? (
+                    <img 
+                      src={video.thumbnail} 
+                      alt={isRtl ? video.title?.ar : video.title?.en} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-700">
+                      <Play size={48} />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-blue-600 transition-colors group-hover:scale-110 duration-300">
+                      <Play size={20} className={cn("ml-1", isRtl && "ml-0 mr-1 rotate-180")} />
+                    </div>
+                  </div>
+                  {video.duration && (
+                    <div className="absolute bottom-3 right-3 rtl:right-auto rtl:left-3 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-md">
+                      {video.duration}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="p-5 flex flex-col flex-grow">
+                  <h3 className="font-bold text-slate-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    {isRtl ? video.title?.ar || video.title?.en : video.title?.en || video.title?.ar}
+                  </h3>
+                  <div className="mt-auto pt-4 flex items-center justify-between text-xs font-semibold text-slate-500">
+                    <span>{new Date(video.createdAt || Date.now()).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US')}</span>
+                    {video.category && (
+                      <span className="bg-slate-100 px-2 py-1 rounded-md">{video.category}</span>
+                    )}
+                  </div>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -58,7 +58,7 @@ export default function RootDashboard() {
         <Route path="/security" element={<SecurityHardening isRtl={isRtl} />} />
         <Route path="/logs" element={<ServerLogs isRtl={isRtl} />} />
         <Route path="/docs" element={<SystemDocs />} />
-        <Route path="/*" element={<div className="p-8 text-center text-slate-500">System module coming soon</div>} />
+        <Route path="/*" element={<div className="p-16 flex items-center justify-center text-center"><div className="text-slate-500 font-medium text-lg">{isRtl ? 'الصفحة غير موجودة 404' : '404 - Page Not Found'}</div></div>} />
       </Routes>
       <AdminFooter />
     </AdminLayout>

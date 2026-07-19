@@ -12,6 +12,7 @@ import eventRoutes from './event.routes';
 import tenderRoutes from './tender.routes';
 import observatoryRoutes from './observatory.routes';
 import systemRoutes from './system.routes';
+import videoRoutes from './video.routes';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.use('/events', eventRoutes);
 router.use('/tenders', tenderRoutes);
 router.use('/observatory', observatoryRoutes);
 router.use('/violations', observatoryRoutes);
+router.use('/videos', videoRoutes);
 
 // Catch-all for unmatched API routes
 router.use((req, res) => {

@@ -8,6 +8,7 @@ import { SystemDocs } from '../admin/SystemDocs';
 import { AdminFooter } from '../../components/admin/AdminFooter';
 import { Book, User } from 'lucide-react';
 import UserProfile from '../../components/UserProfile';
+import { ArticleManager, JobManager, ViolationManager } from '../admin/Dashboard';
 
 export default function StaffDashboard() {
   const { userData } = useAuth();
@@ -17,9 +18,9 @@ export default function StaffDashboard() {
   const sidebarLinks = [
     { name: isRtl ? 'نظرة عامة' : 'Overview', path: '/staff', icon: <LayoutDashboard size={20} /> },
     { name: isRtl ? 'الملف الشخصي' : 'Profile', path: '/staff/profile', icon: <User size={20} /> },
-    { name: isRtl ? 'إدارة المقالات' : 'Articles', path: '/admin/articles', icon: <FileText size={20} /> },
-    { name: isRtl ? 'إدارة الانتهاكات' : 'Violations', path: '/admin/violations', icon: <ShieldAlert size={20} /> },
-    { name: isRtl ? 'إدارة الوظائف' : 'Jobs', path: '/admin/jobs', icon: <Briefcase size={20} /> },
+    { name: isRtl ? 'إدارة المقالات' : 'Articles', path: '/staff/articles', icon: <FileText size={20} /> },
+    { name: isRtl ? 'إدارة الانتهاكات' : 'Violations', path: '/staff/violations', icon: <ShieldAlert size={20} /> },
+    { name: isRtl ? 'إدارة الوظائف' : 'Jobs', path: '/staff/jobs', icon: <Briefcase size={20} /> },
     { name: isRtl ? 'الإعدادات' : 'Settings', path: '/staff/settings', icon: <Settings size={20} /> },
     { name: isRtl ? 'التوثيق' : 'Documentation', path: '/staff/docs', icon: <Book size={20} /> },
   ];
@@ -32,7 +33,10 @@ export default function StaffDashboard() {
       <Routes>
         <Route path="/" element={<StaffOverview isRtl={isRtl} name={userData?.name || ''} />} />
         <Route path="/profile" element={<UserProfile />} />
-        <Route path="/settings" element={<div className="p-8 text-center text-slate-500">Settings coming soon</div>} />
+        <Route path="/articles" element={<ArticleManager isRtl={isRtl} />} />
+        <Route path="/violations" element={<ViolationManager isRtl={isRtl} />} />
+        <Route path="/jobs" element={<JobManager isRtl={isRtl} />} />
+        <Route path="/settings" element={<UserProfile />} />
         <Route path="/docs" element={<SystemDocs />} />
       </Routes>
       <AdminFooter />

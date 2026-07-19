@@ -20,6 +20,8 @@ import WorkplacePolicy from './pages/WorkplacePolicy';
 import Search from './pages/Search';
 import ProjectsDemo from './pages/ProjectsDemo';
 import ProjectDetail from './pages/ProjectDetail';
+import Membership from './pages/Membership';
+import LegalPage from './pages/LegalPage';
 import AdminDashboard from './pages/admin/Dashboard';
 import LoginPage from './pages/admin/LoginPage';
 import RootDashboard from './pages/root/Dashboard';
@@ -135,6 +137,8 @@ const ProtectedRoutes = () => {
       <Route path="/search" element={<Search />} />
       <Route path="/videos" element={<VideoGallery />} />
       <Route path="/cinema" element={<WednesdayCinema />} />
+      <Route path="/membership" element={<Membership />} />
+      <Route path="/legal" element={<LegalPage />} />
       
       {/* Media Products Public URLs */}
       <Route path="/stories/success-story/:slug" element={<MediaProductDetail />} />

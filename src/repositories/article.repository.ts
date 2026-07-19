@@ -3,7 +3,7 @@ import pool from '../db';
 export class ArticleRepository {
   static async findAll(params: any = {}) {
     let query = `
-      SELECT a.*, u.full_name as author 
+      SELECT a.*, u.displayName as author 
       FROM articles a
       LEFT JOIN users u ON a.authorId = u.uid
     `;
@@ -27,7 +27,7 @@ export class ArticleRepository {
 
   static async findById(id: string) {
     const [rows]: any = await pool.query(`
-      SELECT a.*, u.full_name as author 
+      SELECT a.*, u.displayName as author 
       FROM articles a
       LEFT JOIN users u ON a.authorId = u.uid
       WHERE a.id = ?

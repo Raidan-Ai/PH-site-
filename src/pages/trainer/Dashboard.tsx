@@ -6,6 +6,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useTranslation } from 'react-i18next';
 import { AdminFooter } from '../../components/admin/AdminFooter';
 import CourseManager from '../admin/CourseManager';
+import UserProfile from '../../components/UserProfile';
 
 export default function TrainerDashboard() {
   const { userData } = useAuth();
@@ -27,8 +28,8 @@ export default function TrainerDashboard() {
       <Routes>
         <Route path="/" element={<TrainerOverview isRtl={isRtl} name={userData?.name || ''} />} />
         <Route path="/courses" element={<CourseManager />} />
-        <Route path="/applicants" element={<div className="p-8 text-center text-slate-500">Applicants Management Coming Soon</div>} />
-        <Route path="/settings" element={<div className="p-8 text-center text-slate-500">Settings coming soon</div>} />
+        <Route path="/applicants" element={<div className="p-8 text-center text-slate-500">{isRtl ? 'نظام إدارة المتقدمين قيد التطوير.' : 'Applicants management system is under development.'}</div>} />
+        <Route path="/settings" element={<UserProfile />} />
       </Routes>
       <AdminFooter />
     </AdminLayout>

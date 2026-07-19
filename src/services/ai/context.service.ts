@@ -20,8 +20,36 @@ export class AIContextService {
         context += `${idx + 1}. الاسم: ${titleAr} (القسم: ${art.category}, بتاريخ: ${art.createdAt})\n`;
       });
       
-      // ... same logic for projects, jobs, events
-      
+      context += '\n=== المشاريع والبرامج ===\n';
+      (projects as any[]).forEach((proj, idx) => {
+        let titleAr = '';
+        try {
+          const parsed = typeof proj.title === 'string' ? JSON.parse(proj.title) : proj.title;
+          titleAr = parsed?.ar || parsed?.en || proj.title;
+        } catch (e) { titleAr = proj.title; }
+        context += `${idx + 1}. الاسم: ${titleAr} (الحالة: ${proj.status})\n`;
+      });
+
+      context += '\n=== الوظائف المتاحة ===\n';
+      (jobs as any[]).forEach((job, idx) => {
+        let titleAr = '';
+        try {
+          const parsed = typeof job.title === 'string' ? JSON.parse(job.title) : job.title;
+          titleAr = parsed?.ar || parsed?.en || job.title;
+        } catch (e) { titleAr = job.title; }
+        context += `${idx + 1}. الوظيفة: ${titleAr} (الحالة: ${job.status})\n`;
+      });
+
+      context += '\n=== الفعاليات القادمة ===\n';
+      (events as any[]).forEach((evt, idx) => {
+        let titleAr = '';
+        try {
+          const parsed = typeof evt.title === 'string' ? JSON.parse(evt.title) : evt.title;
+          titleAr = parsed?.ar || parsed?.en || evt.title;
+        } catch (e) { titleAr = evt.title; }
+        context += `${idx + 1}. الفعالية: ${titleAr} (بتاريخ: ${evt.event_date})\n`;
+      });
+
       return context;
     } catch (err) {
       console.error('getSiteContext error:', err);

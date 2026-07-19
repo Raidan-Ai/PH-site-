@@ -50,7 +50,7 @@ export default function JournalistDashboard() {
     },
     {
       name: isRtl ? "المنتدى" : "Forum",
-      path: "/forum",
+      path: "/profile/forum",
       icon: <MessageSquare size={20} />,
     },
     {
@@ -88,6 +88,10 @@ export default function JournalistDashboard() {
         />
         <Route path="/violations" element={<JournalistViolations />} />
         <Route path="/edit" element={<UserProfile />} />
+        <Route path="/jobs" element={<ApplicationTracker />} />
+        <Route path="/training" element={<div className="p-8 text-center text-slate-500">{isRtl ? 'نظام إدارة التدريب قيد التطوير.' : 'Training Management System is under development.'}</div>} />
+        <Route path="/portfolio" element={<div className="p-8 text-center text-slate-500">{isRtl ? 'نظام إدارة الأعمال قيد التطوير.' : 'Portfolio Management System is under development.'}</div>} />
+        <Route path="/forum" element={<div className="p-8 text-center text-slate-500">{isRtl ? 'المنتدى قيد التطوير.' : 'Forum is under development.'}</div>} />
         <Route path="/docs" element={<SystemDocs />} />
       </Routes>
       <AdminFooter />

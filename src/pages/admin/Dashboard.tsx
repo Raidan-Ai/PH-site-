@@ -1037,7 +1037,7 @@ function Overview({ isRtl }: { isRtl: boolean }) {
   );
 }
 
-function ViolationManager({ isRtl }: { isRtl: boolean }) {
+export function ViolationManager({ isRtl }: { isRtl: boolean }) {
   const [activeTab, setActiveTab] = useState<'verified' | 'radar' | 'ai-qa' | 'watchlists_alerts'>('radar');
   const [violations, setViolations] = useState<any[]>([]);
   const [potentials, setPotentials] = useState<any[]>([]);
@@ -2310,7 +2310,7 @@ function ViolationManager({ isRtl }: { isRtl: boolean }) {
   );
 }
 
-function ArticleManager({ isRtl }: { isRtl: boolean }) {
+export function ArticleManager({ isRtl }: { isRtl: boolean }) {
   const navigate = useNavigate();
   const [articles, setArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2544,7 +2544,7 @@ function ArticleManager({ isRtl }: { isRtl: boolean }) {
   );
 }
 
-function JobManager({ isRtl }: { isRtl: boolean }) {
+export function JobManager({ isRtl }: { isRtl: boolean }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'jobs' | 'applications'>('jobs');
   const [jobs, setJobs] = useState<any[]>([]);

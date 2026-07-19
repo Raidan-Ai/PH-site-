@@ -18,7 +18,14 @@ export class ObservatoryController {
       const data = { ...req.body, id };
       // Handle file if present
       if (req.file) {
-        // Logic for saving evidence file...
+        const filePath = `/uploads/${Date.now()}-${req.file.originalname}`;
+        const fs = require('fs');
+        const path = require('path');
+        fs.writeFileSync(path.join(process.cwd(), filePath), req.file.buffer);
+        
+        let evidenceLinks = data.evidenceLinks ? JSON.parse(data.evidenceLinks) : [];
+        evidenceLinks.push(filePath);
+        data.evidenceLinks = JSON.stringify(evidenceLinks);
       }
       await ObservatoryRepository.createViolation(data);
       res.json({ id, success: true });

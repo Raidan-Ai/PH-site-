@@ -5730,7 +5730,7 @@ app.get('/api/system/health', async (req, res) => {
 // --- VIDEOS API ---
 app.get('/api/videos', async (req, res) => {
   try {
-    const [rows]: any = await pool.query('SELECT * FROM videos WHERE status = "published" ORDER BY createdAt DESC');
+    const [rows]: any = await pool.query('SELECT * FROM videos WHERE status = 'published' ORDER BY createdAt DESC');
     res.json(rows.map((v: any) => ({
       ...v,
       title: v.title ? JSON.parse(v.title) : { ar: '', en: '' },

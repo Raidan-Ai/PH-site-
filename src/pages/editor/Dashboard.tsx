@@ -6,9 +6,8 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useTranslation } from 'react-i18next';
 import { AdminFooter } from '../../components/admin/AdminFooter';
 import { TenderManager } from '../admin/TenderManager';
-
-const ArticlesManager = () => <div className="p-8 text-center text-slate-500">Articles Management</div>;
-const JobsManager = () => <div className="p-8 text-center text-slate-500">Jobs Management</div>;
+import { ArticleManager, JobManager } from '../admin/Dashboard';
+import UserProfile from '../../components/UserProfile';
 
 export default function EditorDashboard() {
   const { userData } = useAuth();
@@ -30,10 +29,10 @@ export default function EditorDashboard() {
     >
       <Routes>
         <Route path="/" element={<EditorOverview isRtl={isRtl} name={userData?.name || ''} />} />
-        <Route path="/articles" element={<ArticlesManager />} />
-        <Route path="/jobs" element={<JobsManager />} />
+        <Route path="/articles" element={<ArticleManager isRtl={isRtl} />} />
+        <Route path="/jobs" element={<JobManager isRtl={isRtl} />} />
         <Route path="/tenders" element={<TenderManager />} />
-        <Route path="/settings" element={<div className="p-8 text-center text-slate-500">Settings coming soon</div>} />
+        <Route path="/settings" element={<UserProfile />} />
       </Routes>
       <AdminFooter />
     </AdminLayout>
