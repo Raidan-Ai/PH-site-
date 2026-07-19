@@ -7,6 +7,7 @@ import { api } from '../services/api';
 import IncidentTrendVisualizer from '../components/IncidentTrendVisualizer';
 import ViolationForm from '../components/ViolationForm';
 import YemenMap from '../components/YemenMap';
+import LeafletViolationsMap from '../components/LeafletViolationsMap';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -616,12 +617,9 @@ export default function Violations() {
                 <p className="text-slate-500 max-w-2xl mx-auto text-sm md:text-base">{isRtl ? 'انقر على نقاط الخريطة التفاعلية لعرض الإحصائيات الفورية والانتهاكات الخاصة بكل منطقة يمنية.' : 'Click on any province pin on the interactive map to inspect immediate metrics, recent incidents and type distributions.'}</p>
               </div>
               
-              <div className="relative z-10 w-full bg-slate-50 p-4 md:p-8 rounded-[32px] border border-slate-200">
-                <YemenMap 
-                  data={statsByGov} 
-                  violationsList={violations}
-                  selectedGovernorate={selectedGovernorate}
-                  onSelectGovernorate={setSelectedGovernorate}
+              <div className="relative z-10 w-full bg-slate-50 p-4 md:p-8 rounded-[32px] border border-slate-200 min-h-[600px]">
+                <LeafletViolationsMap 
+                  violations={violations}
                 />
               </div>
               

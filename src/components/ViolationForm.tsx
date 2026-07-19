@@ -38,6 +38,8 @@ export default function ViolationForm({ onSuccess }: ViolationFormProps) {
     needs: [] as string[],
     privacyPolicy: 'anonymous', // public | anonymous | secret
     status: 'pending',
+    latitude: '',
+    longitude: '',
   });
 
   const governorates = [
@@ -518,6 +520,30 @@ export default function ViolationForm({ onSuccess }: ViolationFormProps) {
                       <option key={cat.ar} value={cat.ar}>{isRtl ? cat.ar : cat.en}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">{isRtl ? 'خط العرض (Latitude)' : 'Latitude'}</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({...formData, latitude: e.target.value})}
+                    placeholder="15.3694"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm font-semibold font-mono"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">{isRtl ? 'خط الطول (Longitude)' : 'Longitude'}</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({...formData, longitude: e.target.value})}
+                    placeholder="44.1910"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm font-semibold font-mono"
+                  />
                 </div>
               </div>
 
