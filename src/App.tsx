@@ -33,6 +33,7 @@ import VerifyCertificate from './pages/VerifyCertificate';
 import VolunteerPortal from './pages/VolunteerPortal';
 import VolunteerOpportunityDetail from './pages/VolunteerOpportunityDetail';
 import WednesdayCinema from './pages/WednesdayCinema';
+import VideoGallery from './pages/VideoGallery';
 import MaintenancePage from './components/MaintenancePage';
 import { PageLoader } from './components/PageLoader';
 import './i18n';
@@ -132,6 +133,7 @@ const ProtectedRoutes = () => {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/policy" element={<WorkplacePolicy />} />
       <Route path="/search" element={<Search />} />
+      <Route path="/videos" element={<VideoGallery />} />
       <Route path="/cinema" element={<WednesdayCinema />} />
       
       {/* Media Products Public URLs */}

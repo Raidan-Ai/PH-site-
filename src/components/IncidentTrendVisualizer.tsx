@@ -54,6 +54,8 @@ export default function IncidentTrendVisualizer({ violations, isRtl }: IncidentT
     const quartersAr = ['الربع الأول', 'الربع الثاني', 'الربع الثالث', 'الربع الرابع'];
     const quartersEn = ['Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)'];
 
+    const currentYear = new Date().getFullYear();
+
     if (timeResolution === 'monthly') {
       const counts = Array.from({ length: 12 }, (_, i) => ({
         index: i,
@@ -67,7 +69,7 @@ export default function IncidentTrendVisualizer({ violations, isRtl }: IncidentT
       filteredData.forEach(v => {
         if (v.date) {
           const dateObj = new Date(v.date);
-          if (!isNaN(dateObj.getTime())) {
+          if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() === currentYear) {
             const m = dateObj.getMonth();
             counts[m].incidents += 1;
             
@@ -95,7 +97,7 @@ export default function IncidentTrendVisualizer({ violations, isRtl }: IncidentT
       filteredData.forEach(v => {
         if (v.date) {
           const dateObj = new Date(v.date);
-          if (!isNaN(dateObj.getTime())) {
+          if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() === currentYear) {
             const m = dateObj.getMonth();
             const q = Math.floor(m / 3);
             if (q >= 0 && q < 4) {

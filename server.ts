@@ -8,7 +8,6 @@ import { createServer as createViteServer } from 'vite';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from './src/db';
-import { Telegraf } from 'telegraf';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
 import { GoogleGenAI } from '@google/genai';
@@ -69,6 +68,33 @@ async function getSmtpFrom() {
   const [settingsRows]: any = await pool.query('SELECT smtpFrom FROM site_settings LIMIT 1');
   const dbSettings = settingsRows && settingsRows.length > 0 ? settingsRows[0] : null;
   return dbSettings?.smtpFrom || process.env.SMTP_FROM || 'web@ph-ye.org';
+}
+
+/**
+ * Notify system administrators about important events.
+ * (Telegram integration removed - logging to console only)
+ */
+async function notifyAdmins(message: string) {
+  console.log('[ADMIN NOTIFICATION]:', message);
+}
+
+/**
+ * System Health Helper: Get SQLite file size
+ */
+function getDatabaseSize() {
+  try {
+    const dbPath = path.join(process.cwd(), 'database.sqlite');
+    if (fs.existsSync(dbPath)) {
+      const stats = fs.statSync(dbPath);
+      const sizeInBytes = stats.size;
+      if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+      if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(2)} KB`;
+      return `${(sizeInBytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+    return '0 B';
+  } catch (error) {
+    return 'Unknown';
+  }
 }
 
 // Helper for calling the primary AI agent (with Gemini fallback)
@@ -160,26 +186,6 @@ async function callNvidiaAI(prompt: string, systemInstruction: string): Promise<
   return "AI service temporarily unavailable.";
 }
 
-// Helper to broadcast to admins
-async function notifyAdmins(message: string) {
-  if (!isTelegramActive) {
-    console.log('[Telegram Alert - Disabled]:', message);
-    return;
-  }
-  try {
-    const [admins] = await pool.query('SELECT chatId FROM authorized_telegram_users');
-    for (const admin of (admins as any[])) {
-      try {
-        await bot.telegram.sendMessage(admin.chatId, message);
-      } catch (err) {
-        console.error(`Failed notifying admin ${admin.chatId}:`, err);
-      }
-    }
-  } catch (err) {
-    console.error('Error fetching admins for notification:', err);
-  }
-}
-
 // Generate dynamic context from the SQLite Database (for Public queries)
 async function getSiteContext(): Promise<string> {
   try {
@@ -245,868 +251,7 @@ async function getSiteContext(): Promise<string> {
   }
 }
 
-// Initialize Telegram Bot safely using environment variables
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_TOKEN || '';
-const isTelegramActive = !!(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your-telegram-bot-token-here' && !TELEGRAM_TOKEN.startsWith('your-') && TELEGRAM_TOKEN !== '');
-const bot = new Telegraf(isTelegramActive ? TELEGRAM_TOKEN : '123456:placeholder-token-to-prevent-constructor-crash');
-
-// Auth Helper for Admin commands
-const isBotAdmin = async (ctx: any): Promise<boolean> => {
-  const chatId = ctx.from?.id ? ctx.from.id.toString() : '';
-  
-  if (!chatId) return false;
-  
-  try {
-    const [rows] = await pool.query('SELECT * FROM authorized_telegram_users WHERE chatId = ?', [chatId]);
-    if ((rows as any).length > 0) {
-      return true;
-    }
-  } catch (error) {
-    console.error('Bot admin DB check error:', error);
-  }
-  return false;
-};
-
-// Telegram Bot Logic
-bot.start((ctx) => {
-  const welcomeText = `🤖 مرحباً بك في بوت إدارة منصة بيت الصحافة (PressHouse).
-
-هذا البوت الذكي متكامل يمكّن المشرفين من إدارة الموقع وإضافة المحتوى بالكامل والرد التفاعلي على استفسارات الجمهور.
-
-📋 الأوامر العامة المتاحة:
-💬 أرسل أي سؤال مباشرة للرد عليك حول محتويات الموقع وأحدث الأخبار.
-💬 أو استخدم الأمر لـ /ask [السؤال هنا]
-
-👤 لوحة تحكم المشرفين المصرح لهم:
-📊 /stats - عرض إحصائيات فورية للموقع والنشاط.
-📰 /articles - عرض آخر المقالات المنشورة.
-🚨 /violations - عرض الانتهاكات والشكاوى المعلقة.
-📢 /broadcast [الرسالة] - إرسال برودكاست أو نشرة بريدية للمشتركين.
-
-➕ إضافة ونشر المحتوى فوراً بلمسة زر (كل أنواع المحتوى):
-✍️ /add_article [العنوان] | [المحتوى] - نشر خبر/مقال جديد
-✍️ /add_report [العنوان] | [المحتوى] - نشر تقرير حقوقي/صحفي جديد
-🌱 /add_project [العنوان] | [الوصف] | [التمويل المستهدف (أرقام)] - إضافة مشروع جديد
-💼 /add_job [المسمى] | [الوصف] | [الشروط] | [التاريخ YYYY-MM-DD] - إضافة وظيفة
-📅 /add_event [العنوان] | [التفاصيل] | [الموقع] | [التاريخ والوقت] - إضافة ندوة/فعالية
-🏷️ /add_tender [العنوان] | [الوصف الشروط] | [التاريخ النهاية YYYY-MM-DD] - إضافة مناقصة جديدة
-
-معرف الـ Chat ID الخاص بك: ${ctx.from.id}`;
-  ctx.reply(welcomeText);
-});
-
-// Stats Command
-bot.command('stats', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) {
-    return ctx.reply('⚠️ عذراً، أنت غير مصرح لك كمدير لاستخدام هذا الأمر الإداري. معرفك هو: ' + ctx.from.id);
-  }
-  try {
-    const [articles] = await pool.query('SELECT COUNT(*) as count FROM articles');
-    const [events] = await pool.query('SELECT COUNT(*) as count FROM events');
-    const [projects] = await pool.query('SELECT COUNT(*) as count FROM projects');
-    const [jobs] = await pool.query('SELECT COUNT(*) as count FROM jobs');
-    const [violations] = await pool.query('SELECT COUNT(*) as count FROM violations');
-    const [subscribers] = await pool.query('SELECT COUNT(*) as count FROM subscribers');
-    
-    const statsText = `📊 إحصائيات منصة بيت الصحافة المباشرة:
-
-📰 المقالات المنشورة والتقارير: ${(articles as any)[0].count} مقال
-📅 الفعاليات والندوات: ${(events as any)[0].count} فعالية
-🌱 المشاريع والمبادرات: ${(projects as any)[0].count} مشروع
-💼 الوظائف المتاحة شاغرة: ${(jobs as any)[0].count} وظيفة
-🚨 البلاغات والانتهاكات المسجلة: ${(violations as any)[0].count} انتهاك
-✉️ المشتركين في النشرة البريدية: ${(subscribers as any)[0].count} مشترك
-
-الدخول آمن 100% وتحرير كامل عبر تلجرام.`;
-    ctx.reply(statsText);
-  } catch (err: any) {
-    ctx.reply('⚠️ خطأ أثناء جلب الإحصائيات: ' + err.message);
-  }
-});
-
-// Articles list
-bot.command('articles', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  try {
-    const [rows] = await pool.query('SELECT id, title, category, status FROM articles ORDER BY createdAt DESC LIMIT 5');
-    let text = '📰 آخر 5 مقالات منشورة في منصة بيت الصحافة:\n\n';
-    (rows as any[]).forEach((row, i) => {
-      let titleAr = '';
-      try {
-        const parsed = typeof row.title === 'string' ? JSON.parse(row.title) : row.title;
-        titleAr = parsed.ar || parsed.en || row.title;
-      } catch (e) {
-        titleAr = row.title;
-      }
-      text += `${i + 1}. [${row.category}] ${titleAr} (${row.status === 'published' ? '🟢 منشور' : '🟡 مسودة'})\n`;
-    });
-    ctx.reply(text);
-  } catch (err: any) {
-    ctx.reply('⚠️ خطأ: ' + err.message);
-  }
-});
-
-// Violations list
-bot.command('violations', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  try {
-    const [rows] = await pool.query('SELECT id, victimName, governorate, status FROM violations ORDER BY createdAt DESC LIMIT 5');
-    let text = '🚨 آخر 5 بلاغات انتهاك واردة ومسجلة:\n\n';
-    (rows as any[]).forEach((row, i) => {
-      text += `${i + 1}. الضحية/المؤسسة: ${row.victimName} (${row.governorate}) - [ID: ${row.id}]\nالحالة: ${row.status === 'verified' ? '🟢 معتمد' : row.status === 'pending' ? '🟡 معلق' : '🔴 مرفوض'}\n\n`;
-    });
-    ctx.reply(text);
-  } catch (err: any) {
-    ctx.reply('⚠️ خطأ: ' + err.message);
-  }
-});
-
-// Jobs list
-bot.command('jobs', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  try {
-    const [rows] = await pool.query('SELECT id, title, status FROM jobs ORDER BY createdAt DESC LIMIT 5');
-    let text = '💼 آخر 5 وظائف وبلاغات شغل معلنة:\n\n';
-    (rows as any[]).forEach((row, i) => {
-      let titleAr = '';
-      try {
-        const parsed = typeof row.title === 'string' ? JSON.parse(row.title) : row.title;
-        titleAr = parsed.ar || parsed.en || row.title;
-      } catch (e) {
-        titleAr = row.title;
-      }
-      text += `${i + 1}. الوظيفة: ${titleAr} [ID: ${row.id}] - ${row.status === 'open' ? '🟢 مفتوحة' : '🔴 مغلقة'}\n`;
-    });
-    ctx.reply(text);
-  } catch (err: any) {
-    ctx.reply('⚠️ خطأ: ' + err.message);
-  }
-});
-
-// Broadcast Newsletter via MS 365 SMTP
-bot.command('broadcast', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  const msgText = ctx.message.text.substring(10).trim();
-  if (!msgText) {
-    return ctx.reply('⚠️ يرجى كتابة نص الرسالة البريدية بعد الأمر.\nمثال: /broadcast مرحباً بكم في نشرتنا الجديدة...');
-  }
-  
-  const senderEmail = process.env.SMTP_USER || 'web@ph-ye.org';
-  ctx.reply(`📢 جاري إرسال النشرة البريدية لجميع المشتركين عبر بريد منصة بيت الصحافة (${senderEmail})...`);
-  
-  try {
-    const [subscribers] = await pool.query('SELECT email FROM subscribers');
-    const emailsList = (subscribers as any[]).map(s => s.email);
-    
-    if (emailsList.length === 0) {
-      return ctx.reply('⚠️ لا يوجد مشتركين في النشرة البريدية حالياً.');
-    }
-
-    const htmlContent = `
-      <div style="font-family: 'Cairo', sans-serif; direction: rtl; text-align: right; border-top: 4px solid #1e3a8a; padding: 24px; background-color: #f8fafc;">
-        <h2 style="color: #1e3a8a;">بيت الصحافة - Press House Yemen</h2>
-        <p style="font-size: 16px; color: #334155; line-height: 1.8;">${msgText.replace(/\n/g, '<br>')}</p>
-        <hr style="border-top: 1px solid #e2e8f0; margin-top: 30px;">
-        <p style="font-size: 11px; color: #64748b;">لقد تلقيت هذا البريد الإلكتروني لأنك مشترك بنشرة منصتنا الإعلامية المستقلة.</p>
-        <p style="font-size: 11px; color: #64748b;">© 2026 بيت الصحافة. جميع الحقوق محفوظة.</p>
-      </div>
-    `;
-
-    // Multicast mail dispatch
-    for (const email of emailsList) {
-      const transporter = await getTransporter(); if(transporter) await transporter.sendMail({
-        from: await getSmtpFrom(),
-        to: email,
-        subject: 'نشرة أخبار منصة بيت الصحافة اليمنية',
-        html: htmlContent
-      }).catch(e => console.error(`Failed sending newsletter to ${email}:`, e));
-    }
-
-    // Save history
-    await pool.query(
-      'INSERT INTO newsletter_history (subject, content, recipientCount) VALUES (?, ?, ?)',
-      ['نشرة أخبار منصة بيت الصحافة اليمنية', msgText, emailsList.length]
-    );
-
-    ctx.reply(`✅ تم إرسال برودكاست النشرة البريدية بنجاح إلى ${emailsList.length} مشترك! `);
-  } catch (err: any) {
-    ctx.reply('⚠️ خطأ أثناء إرسال البرودكاست: ' + err.message);
-  }
-});
-
-// In-memory sessions representation for interactive Telegram Bot content creation
-interface TelegramSession {
-  type: 'article' | 'report' | 'project' | 'job' | 'event' | 'tender' | 'course';
-  step: number;
-  data: Record<string, any>;
-}
-const telegramSessions = new Map<string, TelegramSession>();
-
-async function processTelegramWizardStep(ctx: any, session: TelegramSession, input: string) {
-  const isReport = session.type === 'report';
-  const label = isReport ? 'التقرير حقوقي' : 'المقال';
-  const chatId = ctx.from.id.toString();
-
-  if (session.type === 'article' || session.type === 'report') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`✍️ رائع! عنوان ${label} هو: "${session.data.title}"\n\nالخطوة التالية (2/7):\nأضف الآن محتوى ${label} الشامل كاملاً بالتفصيل:`);
-        break;
-      case 2:
-        session.data.content = input.trim();
-        session.step = 3;
-        await ctx.reply(`🖼️ تم حفظ المحتوى بنجاح.\n\nالخطوة التالية (3/7):\nأرسل الآن ملف صورة أو ضع رابط URL لصورة تريد إدراجها (أو اكتب 'تخطي' للتجاوز):`);
-        break;
-      case 3:
-        if (input.toLowerCase() === 'تخطي' || input.includes('skip')) {
-          session.data.mainImage = null;
-        } else {
-          session.data.mainImage = input.trim();
-        }
-        session.step = 4;
-        await ctx.reply(`✨ تم تعيين الصورة الرئيسية بنجاح.\n\nالخطوة التالية (4/7):\nهل تريد إضافة هذه الصورة كصورة مميزة لـ ${label} تظهر في الأعلى؟\n(أرسل "نعم" للتأكيد أو "لا" للتخطي والإبقاء عليها كصورة عادية):`);
-        break;
-      case 4:
-        session.data.isFeatured = input.trim() === 'نعم';
-        session.step = 5;
-        await ctx.reply(`⚙️ تم حفظ الإجراء.\n\nالخطوة التالية (5/7):\nهل تريد أن يظهر هذا ${label} في السلايدر (المعرض المتحرك) في الصفحة الرئيسية للموقع؟\n(أرسل "نعم" للموافقة أو "لا" للتخطي):`);
-        break;
-      case 5:
-        session.data.inSlider = input.trim() === 'نعم' || input.trim() === 'yes';
-        session.step = 6;
-        await ctx.reply(`🏷️ تم الحفظ.\n\nالخطوة التالية (6/7):\nاكتب الكلمات المفتاحية SEO المتعلقة بالموضوع (مفصولة بفاصلة، مثلاً: يمن، صحافة، حقوق حريات):`);
-        break;
-      case 6:
-        session.data.keywords = input.trim();
-        session.step = 7;
-        await ctx.reply(`📅 تم الحفظ بنجاح.\n\nالخطوة النهائية (7/7):\nاكتب تاريخ النشر المفضل بالتنسيق YYYY-MM-DD (أو اكتب 'اليوم' للنشر والتسجيل الآن تلقائياً):`);
-        break;
-      case 7:
-        let publishDate = new Date().toISOString();
-        if (input.trim() !== 'اليوم' && input.trim() !== 'today') {
-          try {
-            publishDate = new Date(input.trim()).toISOString();
-          } catch(e) {
-            publishDate = new Date().toISOString();
-          }
-        }
-        session.data.publishDate = publishDate;
-        session.step = 8;
-        const summary = `📊 مراجعة وتأكيد بيانات ${label}:\n\n` +
-          `📌 العنوان: ${session.data.title}\n` +
-          `📂 القسم: ${isReport ? 'تقارير وحريات' : 'أخبار ومقالات'}\n` +
-          `🖼️ الصورة: ${session.data.mainImage || 'لا يوجد'}\n` +
-          `⭐ مميزة: ${session.data.isFeatured ? 'نعم' : 'لا'}\n` +
-          `⚡ في السلايدر: ${session.data.inSlider ? 'نعم' : 'لا'}\n` +
-          `🏷️ الكلمات المفتاحية: ${session.data.keywords || 'لا يوجد'}\n` +
-          `📅 تاريخ النشر: ${session.data.publishDate.substring(0, 10)}\n\n` +
-          `👈 يرجى كتابة "تأكيد" للنشر والمزامنة الفورية بموقع بيت الصحافة، أو "إلغاء":`;
-        await ctx.reply(summary);
-        break;
-      case 8:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم' || input.trim() === 'confirm') {
-          try {
-            const id = (isReport ? 'rep-' : 'art-') + Math.random().toString(36).substring(2, 9);
-            const category = isReport ? 'report' : 'news';
-            const titleObj = { ar: session.data.title, en: session.data.title };
-            const contentObj = { ar: session.data.content, en: session.data.content };
-            const seoObj = { keywords: session.data.keywords || '' };
-
-            await pool.query(
-              'INSERT INTO articles (id, title, content, category, authorId, status, language, mainImage, seo, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [
-                id,
-                JSON.stringify(titleObj),
-                JSON.stringify(contentObj),
-                category,
-                'admin-uid',
-                'published',
-                'both',
-                session.data.mainImage,
-                JSON.stringify(seoObj),
-                session.data.publishDate,
-                new Date().toISOString()
-              ]
-            );
-
-            if (session.data.inSlider) {
-              const slideId = 'sld-' + Math.random().toString(36).substring(2, 9);
-              await pool.query(
-                'INSERT INTO hero_slides (id, title, subtitle, description, mediaType, mediaUrl, animationType, isActive, `order`, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [
-                  slideId,
-                  JSON.stringify(titleObj),
-                  JSON.stringify({ ar: 'خبر مباشر تفاعلي', en: 'Interactive News' }),
-                  JSON.stringify(titleObj),
-                  'image',
-                  session.data.mainImage || 'https://picsum.photos/seed/slide/1200/600',
-                  'fade',
-                  true,
-                  1,
-                  new Date().toISOString()
-                ]
-              );
-            }
-
-            await ctx.reply(`🎉 مبارك! تم تفاعلياً إنشاء ونشر ${label} في موقع بيت الصحافة (PressHouse) بنجاح!\n\n🔗 رابط المقال: /articles/${id}`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين بقاعدة بيانات SQL: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء معالج إضافة المقال بناءً على رغبتك.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-
-  if (session.type === 'project') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`🌱 اسم المشروع: "${session.data.title}"\n\nالخطوة التالية (2/4):\nاكتب الآن تفاصيل المشروع، وأهدافه التنموية بالتفصيل:`);
-        break;
-      case 2:
-        session.data.description = input.trim();
-        session.step = 3;
-        await ctx.reply(`💵 تم الحفظ.\n\nالخطوة التالية (3/4):\nما هو مبلغ التمويل المستهدف في المشروع بالدولار (أرقام فقط، مثلاً: 15000)؟`);
-        break;
-      case 3:
-        session.data.fundingGoal = parseFloat(input.trim()) || 0;
-        session.step = 4;
-        await ctx.reply(`🖼️ تم تعيين التمويل بنجاح.\n\nالخطوة الأخيرة (4/4):\nأرسل ملف صورة مميزة للمشروع، أو الصق URL صورة، أو اكتب 'تخطي':`);
-        break;
-      case 4:
-        const img = (input.toLowerCase() === 'تخطي' || input.includes('skip')) ? null : input.trim();
-        session.data.image = img;
-        session.step = 5;
-        await ctx.reply(`📝 مراجعة بيانات المشروع:\n\n` +
-          `📌 الاسم: ${session.data.title}\n` +
-          `💵 التمويل المطلوب: $${session.data.fundingGoal}\n` +
-          `🖼️ الصورة: ${session.data.image || 'لا يوجد'}\n\n` +
-          `اكتب "تأكيد" لعرض المشروع فوراً بالموقع، أو "إلغاء":`);
-        break;
-      case 5:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم') {
-          try {
-            const id = 'prj-' + Math.random().toString(36).substring(2, 9);
-            await pool.query(
-              'INSERT INTO projects (id, title, description, image, status, fundingGoal, currentFunding, seo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, JSON.stringify({ ar: session.data.title, en: session.data.title }), JSON.stringify({ ar: session.data.description, en: session.data.description }), session.data.image, 'ongoing', session.data.fundingGoal, 0, null, new Date().toISOString()]
-            );
-            await ctx.reply(`🎉 تم حفظ ونشر مشروع "${session.data.title}" بالموقع بنجاح!`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء إضافة المشروع.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-
-  if (session.type === 'job') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`💼 المسمى الوظيفي: "${session.data.title}"\n\nالخطوة التالية (2/4):\nأدخل الآن شرح الوصف الوظيفي والمسؤوليات الأساسية:`);
-        break;
-      case 2:
-        session.data.description = input.trim();
-        session.step = 3;
-        await ctx.reply(`📑 تم الحفظ.\n\nالخطوة التالية (3/4):\nأدخل متطلبات وشروط التقديم على الوظيفة:`);
-        break;
-      case 3:
-        session.data.requirements = input.trim();
-        session.step = 4;
-        await ctx.reply(`📅 تم الحفظ.\n\nالخطوة الأخيرة (4/4):\nما هو الموعد النهائي للتقديم؟ اكتب التاريخ (YYYY-MM-DD) أو اكتب 'مفتوح':`);
-        break;
-      case 4:
-        session.data.deadline = (input.trim() === 'مفتوح' || input.trim() === 'open') ? null : input.trim();
-        session.step = 5;
-        await ctx.reply(`📝 مراجعة بيانات الوظيفة:\n\n` +
-          `📌 الفرصة: ${session.data.title}\n` +
-          `📅 الموعد النهائي: ${session.data.deadline || 'مفتوح للتقديم'}\n\n` +
-          `اكتب "تأكيد" لنشر الوظيفة بالموقع بالكامل، أو "إلغاء":`);
-        break;
-      case 5:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم') {
-          try {
-            const id = 'job-' + Math.random().toString(36).substring(2, 9);
-            await pool.query(
-              'INSERT INTO jobs (id, title, description, requirements, deadline, status, seo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, JSON.stringify({ ar: session.data.title, en: session.data.title }), JSON.stringify({ ar: session.data.description, en: session.data.description }), JSON.stringify({ ar: session.data.requirements, en: session.data.requirements }), session.data.deadline, 'open', null, new Date().toISOString()]
-            );
-            await ctx.reply(`🎉 تم حفظ وتنشيط الوظيفة شاغرة "${session.data.title}" بنجاح!`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء إضافة الوظيفة.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-
-  if (session.type === 'course') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`🎓 اسم الدورة: "${session.data.title}"\n\nالخطوة التالية (2/4):\nمن هو مدرب هذه الدورة؟:`);
-        break;
-      case 2:
-        session.data.trainer = input.trim();
-        session.step = 3;
-        await ctx.reply(`👨‍🏫 تم الحفظ.\n\nالخطوة التالية (3/4):\nكم عدد المقاعد المتاحة لهذه الدورة؟ (أرقام فقط):`);
-        break;
-      case 3:
-        session.data.capacity = parseInt(input.trim()) || 0;
-        session.step = 4;
-        await ctx.reply(`🔢 تم الحفظ.\n\nالخطوة الأخيرة (4/4):\nمتى ستبدأ الدورة؟ اكتب التاريخ (YYYY-MM-DD):`);
-        break;
-      case 4:
-        session.data.startDate = input.trim();
-        session.step = 5;
-        await ctx.reply(`📝 مراجعة بيانات الدورة:\n\n` +
-          `📌 الاسم: ${session.data.title}\n` +
-          `👨‍🏫 المدرب: ${session.data.trainer}\n` +
-          `🔢 المقاعد: ${session.data.capacity}\n` +
-          `📅 البدء: ${session.data.startDate}\n\n` +
-          `اكتب "تأكيد" لعرض الدورة فوراً بالموقع، أو "إلغاء":`);
-        break;
-      case 5:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم') {
-          try {
-            const id = 'crs-' + Math.random().toString(36).substring(2, 9);
-            await pool.query(
-              'INSERT INTO courses (id, title, description, trainer, applicationDeadline, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [id, JSON.stringify({ ar: session.data.title, en: session.data.title }), JSON.stringify({ ar: 'دورة تفاعلية جديدة', en: 'New interactive course' }), JSON.stringify({ ar: session.data.trainer, en: session.data.trainer }), session.data.startDate, 'open', new Date().toISOString()]
-            );
-            await ctx.reply(`🎉 تم حفظ ونشر دورة "${session.data.title}" بالموقع بنجاح!`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء إضافة الدورة.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-
-  if (session.type === 'event') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`📅 اسم الفعالية: "${session.data.title}"\n\nالخطوة التالية (2/4):\nأدخل أهداف وتفاصيل الندوة/الفعالية بشكل دقيق:`);
-        break;
-      case 2:
-        session.data.description = input.trim();
-        session.step = 3;
-        await ctx.reply(`📍 تم الحفظ.\n\nالخطوة التالية (3/4):\nما هو المكان أو المقر الجغرافي للفعالية؟ (مثلاً: أونلاين أو صنعاء - قاعة الشباب):`);
-        break;
-      case 3:
-        session.data.location = input.trim();
-        session.step = 4;
-        await ctx.reply(`📅 تم الحفظ.\n\nالخطوة الأخيرة (4/4):\nما هو تاريخ ووقت إقامة اللقاء؟ تدرج هكذا: YYYY-MM-DD HH:MM (مثلاً: 2026-07-20 18:00):`);
-        break;
-      case 4:
-        session.data.eventDate = input.trim();
-        session.step = 5;
-        await ctx.reply(`📝 مراجعة تفاصيل الندوة:\n\n` +
-          `📌 العنوان: ${session.data.title}\n` +
-          `📍 المكان: ${session.data.location}\n` +
-          `📅 التاريخ: ${session.data.eventDate}\n\n` +
-          `اكتب "تأكيد" لعرض الندوة في الموقع الفوري، أو "إلغاء":`);
-        break;
-      case 5:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم') {
-          try {
-            const id = 'evt-' + Math.random().toString(36).substring(2, 9);
-            await pool.query(
-              'INSERT INTO events (id, title, description, event_date, location, image, status, isLive, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [id, JSON.stringify({ ar: session.data.title, en: session.data.title }), JSON.stringify({ ar: session.data.description, en: session.data.description }), session.data.eventDate, JSON.stringify({ ar: session.data.location, en: session.data.location }), null, 'upcoming', 0, new Date().toISOString()]
-            );
-            await ctx.reply(`🎉 تم حفظ وعرض اللقاء/الندوة "${session.data.title}" بالموقع بنجاح!`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء إضافة الفعالية.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-
-  if (session.type === 'tender') {
-    switch (session.step) {
-      case 1:
-        session.data.title = input.trim();
-        session.step = 2;
-        await ctx.reply(`🏷️ عنوان المناقصة: "${session.data.title}"\n\nالخطوة التالية (2/3):\nأدخل تفاصيل وشروط وتكاليف المناقصة بالتفصيل:`);
-        break;
-      case 2:
-        session.data.description = input.trim();
-        session.step = 3;
-        await ctx.reply(`📅 تم الحفظ.\n\nالخطوة النهائية (3/3):\nاكتب الموعد النهائي لتقديم العروض والمناقصة (مثلا: YYYY-MM-DD):`);
-        break;
-      case 3:
-        session.data.deadline = input.trim();
-        session.step = 4;
-        await ctx.reply(`📝 مراجعة بيانات طلب عرض السعر / المناقصة:\n\n` +
-          `📌 المناقصة: ${session.data.title}\n` +
-          `📅 تقديم الشروط قبل: ${session.data.deadline}\n\n` +
-          `اكتب "تأكيد" لنشر المناقصة، أو "إلغاء":`);
-        break;
-      case 4:
-        if (input.trim() === 'تأكيد' || input.trim() === 'نعم') {
-          try {
-            const id = 'tnd-' + Math.random().toString(36).substring(2, 9);
-            await pool.query(
-              'INSERT INTO tenders (id, title, description, deadline, status, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-              [id, JSON.stringify({ ar: session.data.title, en: session.data.title }), JSON.stringify({ ar: session.data.description, en: session.data.description }), session.data.deadline, 'open', new Date().toISOString()]
-            );
-            await ctx.reply(`🎉 تم بنجاح نشر وإعلان المناقصة في الموقع!`);
-          } catch (e: any) {
-            await ctx.reply(`⚠️ فشل التخزين: ` + e.message);
-          }
-        } else {
-          await ctx.reply('❌ تم إلغاء إضافة المناقصة.');
-        }
-        telegramSessions.delete(chatId);
-        break;
-    }
-    return;
-  }
-}
-
-
-// Add project command
-bot.command('add_project', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  const args = ctx.message.text.substring(13).split('|');
-  if (args.length < 2) {
-    telegramSessions.set(ctx.from.id.toString(), {
-      type: 'project',
-      step: 1,
-      data: {}
-    });
-    return ctx.reply('🤖 تم تشغيل معالج إضافة المشاريع والمبادرات التفاعلي.\n\nالخطوة (1/4):\nما هو اسم المشروع / المبادرة التنموية؟ (اكتب "إلغاء" للخروج في أي وقت):');
-  }
-  const title = args[0].trim();
-  const description = args[1].trim();
-  const fundingGoal = args[2] ? parseFloat(args[2].trim()) : 0;
-  const status = (args[3] || 'ongoing').trim();
-  
-  try {
-    const id = 'prj-' + Math.random().toString(36).substring(2, 9);
-    const titleObj = { ar: title, en: title };
-    const descObj = { ar: description, en: description };
-    
-    await pool.query(
-      'INSERT INTO projects (id, title, description, image, status, fundingGoal, currentFunding, seo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        id, 
-        JSON.stringify(titleObj), 
-        JSON.stringify(descObj), 
-        null, // image
-        status, 
-        fundingGoal, 
-        0, // currentFunding
-        null, // seo
-        new Date().toISOString()
-      ]
-    );
-    ctx.reply(`✅ تم بنجاح إضافة المشروع الجديد في الموقع!\n\n🌱 المشروع: ${title}\n📂 الحالة: ${status === 'ongoing' ? 'قائم' : status === 'completed' ? 'منتهي' : 'يبحث عن تمويل'}\n💵 التمويل المطلوب: $${fundingGoal}\n🆔 معرف المشروع: ${id}`);
-  } catch (err: any) {
-    ctx.reply('⚠️ فشل إضافة المشروع: ' + err.message);
-  }
-});
-
-// Add job command
-bot.command('add_job', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  const args = ctx.message.text.substring(9).split('|');
-  if (args.length < 3) {
-    telegramSessions.set(ctx.from.id.toString(), {
-      type: 'job',
-      step: 1,
-      data: {}
-    });
-    return ctx.reply('🤖 تم تشغيل معالج إضافة الفرص الوظيفية التفاعلي.\n\nالخطوة (1/4):\nما هو مسمى الوظيفة الشاغرة؟ (اكتب "إلغاء" للخروج في أي وقت):');
-  }
-  const title = args[0].trim();
-  const description = args[1].trim();
-  const requirements = args[2].trim();
-  const deadline = args[3] ? args[3].trim() : null;
-
-  try {
-    const id = 'job-' + Math.random().toString(36).substring(2, 9);
-    const titleObj = { ar: title, en: title };
-    const descObj = { ar: description, en: description };
-    const reqObj = { ar: requirements, en: requirements };
-
-    await pool.query(
-      'INSERT INTO jobs (id, title, description, requirements, deadline, status, seo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        id,
-        JSON.stringify(titleObj),
-        JSON.stringify(descObj),
-        JSON.stringify(reqObj),
-        deadline,
-        'open',
-        null,
-        new Date().toISOString()
-      ]
-    );
-    ctx.reply(`✅ تم بنجاح إضافة الوظيفة الشاغرة الجديدة وصياغتها بنجاح بالموقع!\n\n💼 الوظيفة: ${title}\n📅 الموعد النهائي: ${deadline || 'مفتوح'}\n🆔 معرف الوظيفة: ${id}`);
-  } catch (err: any) {
-    ctx.reply('⚠️ فشل نشر الوظيفة: ' + err.message);
-  }
-});
-
-// Add event command
-bot.command('add_event', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  const args = ctx.message.text.substring(11).split('|');
-  if (args.length < 3) {
-    telegramSessions.set(ctx.from.id.toString(), {
-      type: 'event',
-      step: 1,
-      data: {}
-    });
-    return ctx.reply('🤖 تم تشغيل معالج إضافة اللقاءات والندوات التفاعلي.\n\nالخطوة (1/4):\nما هو اسم الفعالية/الندوة؟ (اكتب "إلغاء" في أي وقت):');
-  }
-  const title = args[0].trim();
-  const description = args[1].trim();
-  const locationText = args[2].trim();
-  const eventDate = args[3] ? args[3].trim() : new Date().toISOString();
-
-  try {
-    const id = 'evt-' + Math.random().toString(36).substring(2, 9);
-    const titleObj = { ar: title, en: title };
-    const descObj = { ar: description, en: description };
-    const locObj = { ar: locationText, en: locationText };
-
-    await pool.query(
-      'INSERT INTO events (id, title, description, event_date, location, image, status, isLive, liveStreamUrl, streamKey, streamUrl, media, seo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        id,
-        JSON.stringify(titleObj),
-        JSON.stringify(descObj),
-        eventDate,
-        JSON.stringify(locObj),
-        null,
-        'upcoming',
-        0,
-        null,
-        null,
-        null,
-        null,
-        null,
-        new Date().toISOString()
-      ]
-    );
-    ctx.reply(`✅ تم بنجاح رصد وإضافة اللقاء/الفعالية في موقع المنصة المباشر!\n\n📅 الفعالية: ${title}\n📍 الموقع: ${locationText}\n🆔 معرف الفعالية: ${id}`);
-  } catch (err: any) {
-    ctx.reply('⚠️ فشل نشر الفعالية الأساسية: ' + err.message);
-  }
-});
-
-// Add tender command
-bot.command('add_tender', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  const args = ctx.message.text.substring(12).split('|');
-  if (args.length < 2) {
-    telegramSessions.set(ctx.from.id.toString(), {
-      type: 'tender',
-      step: 1,
-      data: {}
-    });
-    return ctx.reply('🤖 تم تشغيل معالج إضافة المناقصات والفرص التفاعلي.\n\nالخطوة (1/3):\nما هو عنوان المناقصة أو طلب عرض السعر؟ (اكتب "إلغاء" للخروج):');
-  }
-  const title = args[0].trim();
-  const description = args[1].trim();
-  const deadline = args[2] ? args[2].trim() : null;
-
-  try {
-    const id = 'tnd-' + Math.random().toString(36).substring(2, 9);
-    const titleObj = { ar: title, en: title };
-    const descObj = { ar: description, en: description };
-
-    await pool.query(
-      'INSERT INTO tenders (id, title, description, documents, deadline, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [
-        id,
-        JSON.stringify(titleObj),
-        JSON.stringify(descObj),
-        null,
-        deadline,
-        'open',
-        new Date().toISOString()
-      ]
-    );
-    ctx.reply(`✅ تم بنجاح إضافة المناقصة/طلب الشراء الجديد بالموقع بنجاح!\n\n🏷️ المناقصة: ${title}\n📅 الموعد النهائي: ${deadline || 'مفتوح للتقديم المتكامل'}\n🆔 معرف المناقصة: ${id}`);
-  } catch (err: any) {
-    ctx.reply('⚠️ فشل نشر المناقصة: ' + err.message);
-  }
-});
-
-bot.command('add_course', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  telegramSessions.set(ctx.from.id.toString(), {
-    type: 'course',
-    step: 1,
-    data: {}
-  });
-  return ctx.reply('🤖 تم تشغيل معالج إضافة دورة تدريبية.\n\nالخطوة (1/4):\nما هو اسم الدورة؟ (اكتب "إلغاء" للخروج):');
-});
-
-bot.command('summary', async (ctx) => {
-  if (!(await isBotAdmin(ctx))) return ctx.reply('⚠️ غير مصرح لك.');
-  
-  try {
-    const [violations] = await pool.query('SELECT victimName, type FROM violations ORDER BY createdAt DESC LIMIT 5');
-    const [articles] = await pool.query('SELECT title FROM articles ORDER BY createdAt DESC LIMIT 5');
-    const [courses] = await pool.query('SELECT title FROM courses ORDER BY createdAt DESC LIMIT 5');
-    
-    let summaryText = `📊 <b>إحصائيات وملخص المنصة الحالي:</b>\n\n`;
-    summaryText += `📝 <b>آخر المقالات المنشورة:</b>\n`;
-    for (const a of articles as any[]) {
-      try {
-        const titleObj = typeof a.title === 'string' ? JSON.parse(a.title) : a.title;
-        summaryText += `- ${titleObj.ar || titleObj.en || a.title}\n`;
-      } catch {
-        summaryText += `- ${a.title}\n`;
-      }
-    }
-    summaryText += `\n🚨 <b>آخر الانتهاكات المرصودة (المرصد):</b>\n`;
-    for (const v of violations as any[]) {
-      summaryText += `- ${v.victimName} (${v.type})\n`;
-    }
-    summaryText += `\n🎓 <b>آخر الدورات المتاحة بالأكاديمية:</b>\n`;
-    for (const c of courses as any[]) {
-      try {
-        const titleObj = typeof c.title === 'string' ? JSON.parse(c.title) : c.title;
-        summaryText += `- ${titleObj.ar || titleObj.en || c.title}\n`;
-      } catch {
-        summaryText += `- ${c.title}\n`;
-      }
-    }
-    await ctx.replyWithHTML(summaryText);
-  } catch (error: any) {
-    await ctx.reply('⚠️ فشل جلب الملخص: ' + error.message);
-  }
-});
-
-async function handleAskQuery(ctx: any, query: string) {
-  try {
-    const siteContentContext = await getSiteContext();
-    const systemPromptAdmin = `أنت المساعد الذكي لموقع بيت الصحافة (PressHouse) في اليمن. 
-مهمتك هي الإجابة عن أسئلة الزوار والجمهور بالاستعانة بالمحتوى العام والبيانات والفعاليات والوظائف الحالية المنشورة في الموقع المرفقة في السياق أدناه. 
-
-تحدث بأسلوب صحفي متميز، دافئ، احترافي، وموثوق ومبسط للغاية باللهجة العربية الفصحى.
-
-تنبيه هام ومطلق: لا تذكر أبداً اسم الموديل الخاص بك (مثل Nvidia Qwen 3.5 122B أو أي اسم تقني الآخر) تحت أي ظرف في إجابتك. إذا سئلت من أنت أو كيف تعمل، يجب أن يكون ردك حصراً بأنك "هذا البوت الذكي" أو "المساعد الذكي لمنصة بيت الصحافة".
-
-السياق الحالي لمحتويات الموقع:
-${siteContentContext}`;
-
-    const reply = await callNvidiaAI(query, systemPromptAdmin);
-    ctx.reply(reply + '\n\n🤖 [تمت الإجابة عبر المساعد الذكي]');
-  } catch (err: any) {
-    ctx.reply('⚠️ واجهت مشكلة في التوصيل بمساعد الذكاء الاصطناعي: ' + err.message);
-  }
-}
-
-bot.on('text', async (ctx) => {
-  const chatId = ctx.from.id.toString();
-  const text = ctx.message.text.trim();
-
-  if (text === 'إلغاء' || text === 'cancel' || text === '/cancel') {
-    if (telegramSessions.has(chatId)) {
-      telegramSessions.delete(chatId);
-      return ctx.reply('❌ تم إلغاء المعالج الحالي بنجاح والرجوع للقائمة الأساسية.');
-    }
-  }
-
-  if (telegramSessions.has(chatId)) {
-    const session = telegramSessions.get(chatId)!;
-    await processTelegramWizardStep(ctx, session, text);
-    return;
-  }
-
-  if (text.startsWith('/')) return; // Ignore unhandled commands
-
-  // If the user is an admin, let them chat with the AI assistant to execute command or get grounded answer
-  if (await isBotAdmin(ctx)) {
-    ctx.replyWithChatAction('typing');
-    try {
-      const result = await executeAdminAICommand(text, 'telegram-admin-' + chatId);
-      if (result.action && result.action !== 'none') {
-        let confirmationText = `⚙️ <b>[إجراء إداري ذكي منفذ]</b>\n\n`;
-        confirmationText += `🎯 <b>العملية:</b> ${result.action}\n`;
-        confirmationText += `💬 <b>الرد الكلي:</b> ${result.text}\n\n`;
-        if (result.data) {
-          confirmationText += `🔧 <b>البيانات المستخرجة للـ DB:</b>\n<code>${JSON.stringify(result.data, null, 2)}</code>`;
-        }
-        await ctx.replyWithHTML(confirmationText);
-      } else {
-        await ctx.reply(result.text + '\n\n🤖 [المساعد الذكي للمشرفين]');
-      }
-    } catch (err: any) {
-      await ctx.reply('⚠️ فشل في معالجة طلبك عبر المساعد الإداري الذكي: ' + err.message);
-    }
-    return;
-  }
-  
-  await handleAskQuery(ctx, text);
-});
-
-// Photo attachment handler for interactive wizards
-bot.on('photo', async (ctx) => {
-  const chatId = ctx.from.id.toString();
-  if (telegramSessions.has(chatId)) {
-    const session = telegramSessions.get(chatId)!;
-    try {
-      const photos = ctx.message.photo;
-      const fileId = photos[photos.length - 1].file_id;
-      const fileLink = await ctx.telegram.getFileLink(fileId);
-      const imageUrl = fileLink.href;
-      await processTelegramWizardStep(ctx, session, imageUrl);
-    } catch (e: any) {
-      await ctx.reply('⚠️ تعذر معالجة ملف الصورة المرسلة. يرجى كتابة رابط URL للصورة أو كتابة "تخطي" للمتابعة:');
-    }
-    return;
-  }
-  ctx.reply('👁️ لقد أرسلت صورة للتو. يمكنك طرح أي سؤال للاستعلام عن منصة الصحافة اليمنية!');
-});
-
-if (isTelegramActive) {
-  bot.launch({ dropPendingUpdates: true }).then(() => console.log('Telegram Bot running successfully (@YJPT_ai)')).catch(err => {
-    if (err.message && err.message.includes('409')) {
-      console.log('Telegram Bot already running, ignoring conflict.');
-    } else {
-      console.error('Telegram Bot failed to start:', err);
-    }
-  });
-} else {
-  console.log('Telegram Bot is disabled (TELEGRAM_BOT_TOKEN not configured or placeholder)');
-}
+// Telegram Bot Logic (Integration Removed)
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -3925,14 +3070,8 @@ app.post('/api/violations', upload.single('evidenceFile'), async (req, res) => {
       fs.writeFileSync(path.join(__dirname, filePath), req.file.buffer);
     }
 
-    // Save to DB (omitted for brevity, need to keep existing query)
-    // Send Telegram Notification
-    if (isTelegramActive) {
-      const msg = `⚠️ **بلاغ انتهاك جديد**\n\nالضحية: ${victimName}\nالنوع: ${type}\nالوصف: ${description.substring(0, 100)}...`;
-      for (const tUser of await pool.query('SELECT chatId FROM authorized_telegram_users')) {
-        await bot.telegram.sendMessage(tUser.chatId, msg, { parse_mode: 'Markdown' });
-      }
-    }
+    // Save to DB
+    // (Telegram notification removed)
     
     // ... rest of the original query and response
 
@@ -6443,34 +5582,98 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-app.get('/api/telegram-users', async (req, res) => {
+app.get('/api/system/health', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM authorized_telegram_users ORDER BY createdAt DESC');
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching telegram users' });
+    // Check DB connection
+    const [dbCheck] = await pool.query('SELECT 1 as active');
+    const dbStatus = dbCheck && dbCheck.length > 0 ? 'Connected' : 'Error';
+    
+    // Get file size
+    const dbSize = getDatabaseSize();
+    
+    res.json({
+      success: true,
+      database: {
+        status: dbStatus,
+        size: dbSize,
+        provider: usePostgres ? 'PostgreSQL' : 'SQLite'
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      database: {
+        status: 'Disconnected',
+        size: 'Unknown'
+      }
+    });
   }
 });
 
-app.post('/api/telegram-users', async (req, res) => {
+// --- VIDEOS API ---
+app.get('/api/videos', async (req, res) => {
   try {
-    const { chatId, username, displayName } = req.body;
+    const [rows]: any = await pool.query('SELECT * FROM videos WHERE status = "published" ORDER BY createdAt DESC');
+    res.json(rows.map((v: any) => ({
+      ...v,
+      title: v.title ? JSON.parse(v.title) : { ar: '', en: '' },
+      description: v.description ? JSON.parse(v.description) : { ar: '', en: '' },
+      tags: v.tags ? JSON.parse(v.tags) : []
+    })));
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/videos', async (req, res) => {
+  try {
+    const { id, title, description, url, thumbnail, category, tags, duration, authorId } = req.body;
+    
+    // Automatic thumbnail generation if missing
+    let finalThumbnail = thumbnail;
+    if (!finalThumbnail && url) {
+      // Logic: If it's a YouTube link, we can get the thumbnail easily
+      const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=)?(.+)/);
+      if (ytMatch && ytMatch[1]) {
+        finalThumbnail = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
+      } else {
+        // Use a stylized placeholder or Gemini could generate one based on title
+        finalThumbnail = `https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?auto=format&fit=crop&q=80&w=800&text=${encodeURIComponent(JSON.parse(title).ar)}`;
+      }
+    }
+
     await pool.query(
-      'INSERT INTO authorized_telegram_users (chatId, username, displayName) VALUES (?, ?, ?)',
-      [chatId, username, displayName]
+      'INSERT INTO videos (id, title, description, url, thumbnail, category, tags, duration, authorId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title, description, url, finalThumbnail, category, tags, duration, authorId]
+    );
+    res.json({ success: true, thumbnail: finalThumbnail });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put('/api/videos/:id', async (req, res) => {
+  try {
+    const { title, description, url, thumbnail, category, tags, duration, status } = req.body;
+    await pool.query(
+      'UPDATE videos SET title=?, description=?, url=?, thumbnail=?, category=?, tags=?, duration=?, status=?, updatedAt=CURRENT_TIMESTAMP WHERE id=?',
+      [title, description, url, thumbnail, category, tags, duration, status, req.params.id]
     );
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ message: 'Error adding telegram user' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.delete('/api/telegram-users/:id', async (req, res) => {
+app.delete('/api/videos/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM authorized_telegram_users WHERE id = ?', [req.params.id]);
+    await pool.query('DELETE FROM videos WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ message: 'Error deleting telegram user' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

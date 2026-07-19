@@ -433,6 +433,107 @@ const initDb = () => {
 export async function runExtraMigrations() {
 // Add dynamic migrations for existing database
 try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      uid TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT,
+      displayName TEXT,
+      photoURL TEXT,
+      role TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Database Migration: Checked/Created users table');
+} catch (e: any) {
+  console.error('Migration Error (users):', e.message);
+}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS articles (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      category TEXT NOT NULL,
+      authorId TEXT,
+      status TEXT NOT NULL,
+      language TEXT NOT NULL,
+      mainImage TEXT,
+      show_in_slider INTEGER DEFAULT 0,
+      slider_caption TEXT,
+      slider_button_text TEXT,
+      slider_image TEXT,
+      seo TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Database Migration: Checked/Created articles table');
+} catch (e: any) {
+  console.error('Migration Error (articles):', e.message);
+}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS violations (
+      id TEXT PRIMARY KEY,
+      reporterName TEXT,
+      reporterPhone TEXT,
+      reporterType TEXT,
+      reporterRelation TEXT,
+      victimName TEXT,
+      victimInstitution TEXT,
+      victimPenName TEXT,
+      victimSocials TEXT,
+      victimPhone TEXT,
+      governorate TEXT,
+      district TEXT,
+      date DATETIME,
+      perpetrator TEXT,
+      type TEXT,
+      violationReason TEXT,
+      description TEXT,
+      evidenceTypes TEXT,
+      evidenceLinks TEXT,
+      needs TEXT,
+      privacyPolicy TEXT,
+      status TEXT NOT NULL,
+      latitude REAL,
+      longitude REAL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Database Migration: Checked/Created violations table');
+} catch (e: any) {
+  console.error('Migration Error (violations):', e.message);
+}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS videos (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      url TEXT NOT NULL,
+      thumbnail TEXT,
+      category TEXT,
+      tags TEXT,
+      views INTEGER DEFAULT 0,
+      likes INTEGER DEFAULT 0,
+      duration TEXT,
+      status TEXT DEFAULT 'published',
+      authorId TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('Database Migration: Checked/Created videos table');
+} catch (e: any) {
+  console.error('Migration Error (videos):', e.message);
+}
+
+try {
   db.exec("ALTER TABLE violations ADD COLUMN latitude REAL;");
   console.log('Database Migration: Added latitude column to violations');
 } catch (e) {

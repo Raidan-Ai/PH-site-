@@ -3,13 +3,18 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SEO } from '../components/common/SEO';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
-import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Link as LinkIcon, Clock, Tag, ChevronRight, Star } from 'lucide-react';
+import { Calendar, User, ArrowLeft, Share2, Facebook, Twitter, Link as LinkIcon, Clock, Tag, ChevronRight, Star, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Article } from '../types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { api } from '../services/api';
 import NewsletterSignup from '../components/NewsletterSignup';
+
+// Swiper for media slider
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay } from 'swiper/modules';
+import 'swiper/css';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -21,32 +26,6 @@ export default function ArticleDetail() {
   const isRtl = i18n.language === 'ar';
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Ratings States
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [ratingComment, setRatingComment] = useState('');
-  const [ratingName, setRatingName] = useState('');
-  const [ratingEmail, setRatingEmail] = useState('');
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [submittingRating, setSubmittingRating] = useState(false);
-  const [ratingStats, setRatingStats] = useState({ count: 0, avgRating: '0.0' });
-
-  const fetchRatingStats = async () => {
-    if (!id) return;
-    try {
-      const response = await api.get(`/api/feedback/ratings/${id}`);
-      setRatingStats(response.data || { count: 0, avgRating: '0.0' });
-    } catch (err) {
-      console.error('Error loading rating statistics:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (id) {
-      fetchRatingStats();
-    }
-  }, [id]);
 
   useEffect(() => {
     if (id) {
@@ -193,20 +172,62 @@ export default function ArticleDetail() {
         </div>
       </header>
 
-      {/* Main Image */}
+      {/* Media Slider */}
       <div className="container mx-auto px-6 -mt-16 relative z-20">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="max-w-5xl mx-auto aspect-[21/9] rounded-[48px] overflow-hidden shadow-2xl border-8 border-white"
+          className="max-w-5xl mx-auto rounded-[48px] overflow-hidden shadow-2xl border-8 border-white bg-white"
         >
-          <img 
-            src={article.mainImage} 
-            alt={title} 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+          <Swiper
+            modules={[Autoplay]}
+            spaceBetween={0}
+            slidesPerView={1}
+            loop={true}
+            speed={8000}
+            autoplay={{
+              delay: 0,
+              disableOnInteraction: false,
+            }}
+            allowTouchMove={false}
+            className="w-full aspect-[21/9] article-media-slider"
+          >
+            <SwiperSlide>
+              <img 
+                src={article.mainImage} 
+                alt={title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </SwiperSlide>
+            {/* If more images exist in a future field like 'media' or 'slider_image' */}
+            {(article as any).slider_image && (article as any).slider_image !== article.mainImage && (
+              <SwiperSlide>
+                <img 
+                  src={(article as any).slider_image} 
+                  alt={title} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </SwiperSlide>
+            )}
+            {/* Duplicate slides for a smoother continuous effect if only one or two images */}
+            <SwiperSlide>
+              <img 
+                src={article.mainImage} 
+                alt={title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </SwiperSlide>
+          </Swiper>
+          
+          <style dangerouslySetInnerHTML={{ __html: `
+            .article-media-slider .swiper-wrapper {
+              transition-timing-function: linear !important;
+            }
+          `}} />
         </motion.div>
       </div>
 
@@ -242,131 +263,6 @@ export default function ArticleDetail() {
             ">
               <div dangerouslySetInnerHTML={{ __html: content }} />
             </article>
-
-            {/* Article Rating and Feedback */}
-            <div className="mt-12 p-8 bg-slate-900 text-white rounded-[32px] border border-slate-800 shadow-xl space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-xl font-bold tracking-tight text-white">
-                    {isRtl ? 'ما هو تقييمك لهذا المقال؟' : 'How would you rate this article?'}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {isRtl 
-                      ? 'رأيك يهمنا ويساعدنا في تحسين جودة المحتوى الصحفي المقدم.' 
-                      : 'Your voice matters. Help us elevate journalistic reporting in Yemen.'}
-                  </p>
-                </div>
-                {ratingStats.count > 0 && (
-                  <div className="bg-slate-800 px-4 py-2 rounded-xl text-xs flex items-center gap-2 border border-slate-700 self-start md:self-auto">
-                    <Star size={16} className="text-amber-400 fill-amber-400" />
-                    <span className="font-extrabold text-white text-sm">{ratingStats.avgRating}</span>
-                    <span className="text-slate-400">({ratingStats.count} {isRtl ? 'تقييمات' : 'votes'})</span>
-                  </div>
-                )}
-              </div>
-
-              {ratingSubmitted ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-emerald-950/20 border border-emerald-500/30 p-6 rounded-2xl text-center space-y-2"
-                >
-                  <p className="text-emerald-400 font-extrabold text-sm">
-                    {isRtl ? '✓ نشكرك على تقييمك ورأيك القّيم!' : '✓ Thank you for your feedback and rating!'}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {isRtl 
-                      ? 'تم تسجيل مراجعتك بنجاح في أرشيف بيت الصحافة.' 
-                      : 'Your review was registered successfully in the Press House records.'}
-                  </p>
-                </motion.div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Star selection widget */}
-                  <div className="flex items-center gap-2 py-2 justify-center md:justify-start">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        onMouseEnter={() => setHoverRating(star)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        className="transition-transform hover:scale-110 p-1 bg-transparent border-none cursor-pointer focus:outline-none"
-                      >
-                        <Star 
-                          size={28} 
-                          className={cn(
-                            "transition-colors",
-                            (hoverRating || rating) >= star 
-                              ? "text-amber-400 fill-amber-400" 
-                              : "text-slate-600"
-                          )}
-                        />
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      value={ratingName}
-                      onChange={(e) => setRatingName(e.target.value)}
-                      placeholder={isRtl ? 'الاسم بالكامل (اختياري)' : 'Full Name (Optional)'}
-                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-500"
-                    />
-                    <input
-                      type="email"
-                      value={ratingEmail}
-                      onChange={(e) => setRatingEmail(e.target.value)}
-                      placeholder={isRtl ? 'البريد الإلكتروني (اختياري)' : 'Email (Optional)'}
-                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-500 shadow-sm"
-                    />
-                  </div>
-
-                  <textarea
-                    value={ratingComment}
-                    onChange={(e) => setRatingComment(e.target.value)}
-                    rows={3}
-                    placeholder={isRtl ? 'اكتب تعليقك أو أي ملاحظة تود مشاركتها معنا...' : 'Leave a comment or details about your rating...'}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-500 resize-none shadow-sm"
-                  />
-
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      disabled={submittingRating || rating === 0}
-                      onClick={async () => {
-                        setSubmittingRating(true);
-                        try {
-                          await api.post('/api/feedback', {
-                            name: ratingName || 'Anonymous',
-                            email: ratingEmail || '',
-                            comment: ratingComment,
-                            rating: rating,
-                            feedback_type: 'article_rating',
-                            item_id: id
-                          });
-                          setRatingSubmitted(true);
-                          await fetchRatingStats();
-                        } catch (err) {
-                          console.error(err);
-                        } finally {
-                          setSubmittingRating(false);
-                        }
-                      }}
-                      className={cn(
-                        "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer border-none",
-                        rating === 0 
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
-                          : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-                      )}
-                    >
-                      {submittingRating ? (isRtl ? 'جاري الإرسال...' : 'Submitting...') : (isRtl ? 'إرسال تقييمي' : 'Submit Rating')}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Tags */}
             <div className="mt-16 pt-16 border-t border-slate-100 flex flex-wrap gap-3">

@@ -14,7 +14,6 @@ import { Link } from 'react-router-dom';
 import { HeroSlider } from '../components/home/HeroSlider';
 import YemenMap from '../components/YemenMap';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie } from 'recharts';
-import { SocialReelsSection } from '../components/SocialReelsSection';
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -842,9 +841,6 @@ export default function Home() {
           ))}
         </Swiper>
       </section>
-
-      {/* Social Media Reels Section */}
-      <SocialReelsSection />
     </div>
   );
 }

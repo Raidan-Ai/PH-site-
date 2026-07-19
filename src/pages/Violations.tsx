@@ -162,7 +162,8 @@ export default function Violations() {
   }, [filteredViolations]);
 
   // Dynamic monthly trend computed on active dataset
-  const trendData = useMemo(() => {
+  const currentYearTrend = useMemo(() => {
+    const currentYear = new Date().getFullYear();
     const monthlyCounts: Record<string, number> = {};
     const months = isRtl 
       ? ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
@@ -170,10 +171,10 @@ export default function Violations() {
     
     months.forEach(m => { monthlyCounts[m] = 0; });
 
-    filteredViolations.forEach(v => {
+    violations.forEach(v => {
       if (v.date) {
         const dateObj = new Date(v.date);
-        if (!isNaN(dateObj.getTime())) {
+        if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() === currentYear) {
           const monthIndex = dateObj.getMonth();
           const mName = months[monthIndex];
           monthlyCounts[mName] = (monthlyCounts[mName] || 0) + 1;
@@ -182,7 +183,7 @@ export default function Violations() {
     });
 
     return months.map(m => ({ name: m, cases: monthlyCounts[m] }));
-  }, [filteredViolations, isRtl]);
+  }, [violations, isRtl]);
 
   const COLORS = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5cf6'];
 

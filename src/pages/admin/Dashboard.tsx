@@ -403,18 +403,20 @@ function Overview({ isRtl }: { isRtl: boolean }) {
   });
   const [loading, setLoading] = useState(true);
   const [violationsList, setViolationsList] = useState<any[]>([]);
+  const [systemHealth, setSystemHealth] = useState<any>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [articlesRes, eventsRes, projectsRes, jobsRes, violationsRes, coursesRes, usersRes] = await Promise.all([
+        const [articlesRes, eventsRes, projectsRes, jobsRes, violationsRes, coursesRes, usersRes, healthRes] = await Promise.all([
           api.get('/api/articles').catch(() => ({ data: [] })),
           api.get('/api/events').catch(() => ({ data: [] })),
           api.get('/api/projects').catch(() => ({ data: [] })),
           api.get('/api/jobs').catch(() => ({ data: [] })),
           api.get('/api/violations').catch(() => ({ data: [] })),
           api.get('/api/courses').catch(() => ({ data: [] })),
-          api.get('/api/users').catch(() => ({ data: [] }))
+          api.get('/api/users').catch(() => ({ data: [] })),
+          api.get('/api/system/health').catch(() => ({ data: null }))
         ]);
         
         const articles = articlesRes.data || [];
@@ -426,6 +428,7 @@ function Overview({ isRtl }: { isRtl: boolean }) {
         const users = usersRes.data || [];
         
         setViolationsList(violations);
+        setSystemHealth(healthRes.data);
         
         const now = new Date();
         const upcomingEvents = events.filter((e: any) => new Date(e.event_date) >= now).length;
@@ -637,6 +640,53 @@ function Overview({ isRtl }: { isRtl: boolean }) {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* System Health Section */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Settings className="text-slate-400" size={20} />
+            {isRtl ? 'صحة النظام' : 'System Health'}
+          </h2>
+          {systemHealth?.success && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {isRtl ? 'النظام مستقر' : 'System Stable'}
+            </span>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <p className="text-xs text-slate-500 mb-1">{isRtl ? 'حالة قاعدة البيانات' : 'Database Status'}</p>
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                systemHealth?.database?.status === 'Connected' ? "bg-emerald-500" : "bg-rose-500"
+              )} />
+              <p className="font-bold text-slate-900">{systemHealth?.database?.status || (isRtl ? 'غير متصل' : 'Disconnected')}</p>
+              <span className="text-[10px] text-slate-400 px-1.5 py-0.5 bg-slate-200 rounded uppercase font-mono">
+                {systemHealth?.database?.provider || 'SQL'}
+              </span>
+            </div>
+          </div>
+          
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <p className="text-xs text-slate-500 mb-1">{isRtl ? 'حجم البيانات الحالي' : 'Current Data Size'}</p>
+            <p className="font-bold text-slate-900 flex items-center gap-2">
+              <Layers size={14} className="text-slate-400" />
+              {systemHealth?.database?.size || '0 B'}
+            </p>
+          </div>
+          
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <p className="text-xs text-slate-500 mb-1">{isRtl ? 'وقت التشغيل (Uptime)' : 'Uptime'}</p>
+            <p className="font-bold text-slate-900">
+              {systemHealth?.uptime ? (systemHealth.uptime / 3600).toFixed(2) : '0'} {isRtl ? 'ساعة' : 'hrs'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* CSO Impact Analytics & Indicators Dashboard */}
