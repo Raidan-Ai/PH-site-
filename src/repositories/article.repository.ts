@@ -2,15 +2,19 @@ import pool from '../db';
 
 export class ArticleRepository {
   static async findAll(params: any = {}) {
-    let query = 'SELECT * FROM articles';
+    let query = `
+      SELECT a.*, u.full_name as author 
+      FROM articles a
+      LEFT JOIN users u ON a.authorId = u.uid
+    `;
     const values: any[] = [];
     
     if (params.status) {
-      query += ' WHERE status = ?';
+      query += ' WHERE a.status = ?';
       values.push(params.status);
     }
     
-    query += ' ORDER BY createdAt DESC';
+    query += ' ORDER BY a.createdAt DESC';
     
     if (params.limit) {
       query += ' LIMIT ?';
@@ -22,7 +26,12 @@ export class ArticleRepository {
   }
 
   static async findById(id: string) {
-    const [rows]: any = await pool.query('SELECT * FROM articles WHERE id = ?', [id]);
+    const [rows]: any = await pool.query(`
+      SELECT a.*, u.full_name as author 
+      FROM articles a
+      LEFT JOIN users u ON a.authorId = u.uid
+      WHERE a.id = ?
+    `, [id]);
     return rows && rows.length > 0 ? rows[0] : null;
   }
 
@@ -45,8 +54,29 @@ export class ArticleRepository {
     return result;
   }
 
+  static async incrementViews(id: string) {
+    const [result] = await pool.query('UPDATE articles SET views = views + 1 WHERE id = ?', [id]);
+    return result;
+  }
+
   static async delete(id: string) {
     const [result] = await pool.query('DELETE FROM articles WHERE id = ?', [id]);
     return result;
+  }
+
+  static async getStatsByAuthor(authorId: string) {
+    const query = `
+      SELECT 
+        strftime('%Y-%m-%d', createdAt) as date,
+        COUNT(*) as count,
+        SUM(views) as totalViews,
+        SUM(engagement) as totalEngagement
+      FROM articles 
+      WHERE authorId = ? AND createdAt >= date('now', '-30 days')
+      GROUP BY date
+      ORDER BY date ASC
+    `;
+    const [rows] = await pool.query(query, [authorId]);
+    return rows;
   }
 }

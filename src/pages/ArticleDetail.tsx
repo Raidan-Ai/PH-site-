@@ -32,8 +32,12 @@ export default function ArticleDetail() {
       const fetchArticle = async () => {
         setLoading(true);
         try {
-          const response = await api.get('/api/articles');
-          const data = response.data.find((a: any) => String(a.id) === String(id));
+          // 1. Increment view
+          api.patch(`/api/articles/${id}/view`).catch(e => console.warn("Failed to increment view", e));
+          
+          // 2. Fetch specific article
+          const response = await api.get(`/api/articles/${id}`);
+          const data = response.data;
           if (data) {
             setArticle({
                ...data,

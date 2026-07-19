@@ -18,6 +18,7 @@ import { SystemDocs } from "../admin/SystemDocs";
 import { AdminFooter } from "../../components/admin/AdminFooter";
 import { Book } from "lucide-react";
 import { ApplicationTracker } from "../../components/ApplicationTracker";
+import { JournalistStats } from "../../components/journalist/JournalistStats";
 
 import UserProfile from "../../components/UserProfile";
 
@@ -161,6 +162,10 @@ function JournalistOverview({
         </div>
       </div>
       
+      <div className="mt-8">
+        <JournalistStats />
+      </div>
+
       <div className="mt-8">
         <ApplicationTracker />
       </div>

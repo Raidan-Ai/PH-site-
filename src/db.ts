@@ -582,6 +582,13 @@ for (const col of newViolationCols) {
 }
 
 try {
+  db.exec("ALTER TABLE articles ADD COLUMN views INTEGER DEFAULT 0;");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE articles ADD COLUMN engagement INTEGER DEFAULT 0;");
+} catch (e) {}
+
+try {
   db.exec("ALTER TABLE articles ADD COLUMN access_tier TEXT DEFAULT 'public';");
   console.log('Database Migration: Added access_tier column to articles');
 } catch (e) {

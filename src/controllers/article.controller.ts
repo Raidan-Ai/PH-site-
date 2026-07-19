@@ -21,6 +21,15 @@ export class ArticleController {
     }
   }
 
+  static async incrementView(req: Request, res: Response) {
+    try {
+      await ArticleRepository.incrementViews(req.params.id);
+      res.json({ message: 'View incremented' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error incrementing view' });
+    }
+  }
+
   static async create(req: any, res: Response) {
     try {
       const id = Math.random().toString(36).substring(2, 11);
@@ -58,6 +67,16 @@ export class ArticleController {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: 'Error deleting article' });
+    }
+  }
+
+  static async getAuthorStats(req: any, res: Response) {
+    try {
+      const stats = await ArticleRepository.getStatsByAuthor(req.user.uid);
+      res.json(stats);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error fetching author stats' });
     }
   }
 }
